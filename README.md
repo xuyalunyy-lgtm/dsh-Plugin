@@ -1,6 +1,8 @@
 # 专注日历 / Focus Calendar
 
-当前 Harness 的本地插件：`@local/dsh-focus-calendar`。
+DeepSeek Harness 插件：`dsh-focus-calendar`（专注日历）。
+
+包名采用 `dsh-<功能>` 风格。持久化域保持 `focus_calendar`，因此从旧包名 `@local/dsh-focus-calendar` 迁移不改变已有待办和设置。
 
 ## 使用
 

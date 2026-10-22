@@ -1,5 +1,5 @@
 window.__ModuleLoader__.load({
-  id: '@local/dsh-focus-calendar',
+  id: 'dsh-focus-calendar',
   factory(require) {
     const React = require('react');
     const h = React.createElement;

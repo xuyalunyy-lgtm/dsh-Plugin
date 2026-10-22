@@ -1,4 +1,4 @@
 - insert:
-    - id: local-focus-calendar
-      name: '@local/dsh-focus-calendar'
+    - id: dsh-focus-calendar
+      name: 'dsh-focus-calendar'
       config: {}

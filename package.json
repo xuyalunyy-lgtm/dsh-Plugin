@@ -1,5 +1,5 @@
 {
-  "name": "@local/dsh-focus-calendar",
+  "name": "dsh-focus-calendar",
   "version": "1.0.0",
   "description": "专注日历：每日待办、专注计时、护眼与活动提醒",
   "private": true,
