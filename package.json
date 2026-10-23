@@ -1,0 +1,12 @@
+{
+  "name": "@local/dsh-document-body-search",
+  "version": "0.1.2",
+  "private": true,
+  "type": "module",
+  "description": "Current-document full-text search for PDF and Markdown with highlights and page navigation",
+  "exports": {".": "./index.js", "./client": "./client.js", "./locale/*.json": "./locale/*.json", "./icon": "./icon.svg"},
+  "files": ["index.js", "client.js", "cordis.patch.yml", "locale/*.json", "icon.svg", "THIRD-PARTY-NOTICES.txt"],
+  "scripts": {"build": "node build.mjs", "test": "node --test tests/*.test.mjs"},
+  "devDependencies": {"esbuild": "0.25.12", "pdfjs-dist": "5.4.296"},
+  "dsh": {"bundle": {"patch": "./cordis.patch.yml"}, "client": {"platform": "web", "immediately": true, "inject": ["@deepseek-ai/dsh-client-ui-sidebar-documentpreview", "@deepseek-ai/dsh-client-locale"]}}
+}
