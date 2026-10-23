@@ -1,4 +1,4 @@
 - insert:
-    - id: local-document-body-search
-      name: '@local/dsh-document-body-search'
+    - id: dsh-document-search
+      name: dsh-document-search
       config: {}

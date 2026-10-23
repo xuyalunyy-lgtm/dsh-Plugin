@@ -1,43 +1,77 @@
-# 文档正文查找（workspace bundle）
+# 文档搜索 · dsh-document-search
 
-包：`@local/dsh-document-body-search` 0.1.1。
+DeepSeek Harness 文件助手插件：为当前 PDF 与 Markdown 文档提供全文关键词搜索、高亮、匹配计数和导航。
+
+- 插件显示名称：**文档搜索** / **Document Search**
+- 包名与 Loader 注册标识：`dsh-document-search`
+- 当前版本：**0.2.0**
+- 独立本地 Git 仓库；默认分支 `main`，未配置远程仓库。
 
 ## 使用
 
-在 Harness 文件助手打开当前 PDF 或 Markdown，在文档顶部阅读器下拉中选择 **PDF 全文搜索** 或 **Markdown 源文搜索**。本插件以 `builtin` 优先级追加注册，**不替换原有默认阅读器**；可随时切回内置预览。
+1. 在文件助手中打开 PDF 或 Markdown。
+2. 点击文档顶部、刷新图标左侧的 **PDF** 或 **Markdown** 文字按钮。注意：不是最右侧的文件夹按钮。
+3. 选择 **PDF 全文搜索** 或 **Markdown 源文搜索**。
+4. 输入关键词，用 **上一项 / 下一项** 导航。支持区分大小写；PDF 可自动跳转命中页，也可手动输入页码。
 
-- 当前文档完整字节读取，受 Harness Host 文件大小限制；读取失败明确报错，不把前缀当全文。
-- 字面量查找，大小写选项、全部匹配计数、上下项循环导航、高亮当前项。
-- Enter 下一项、Shift+Enter 上一项、Esc 清空；阅读器内获得焦点时 Ctrl/Cmd+F 聚焦查找框。不劫持全应用快捷键。
-- PDF 对全部页建立文字索引；命中切换并渲染对应页，页码框亦可直接定位。一个页面按容器宽度渲染，PDF.js TextLayer 内高亮可跨同页文本 span。
-- Markdown 显示完整源文，包含 Markdown 标记；不是内置 Markdown 排版上的高亮。
+搜索框中 `Enter` 下一项、`Shift+Enter` 上一项、`Esc` 清空。阅读器内部有焦点时，`Ctrl/Cmd+F` 聚焦搜索框，不劫持整个应用的快捷键。
 
-## 安装与构建
+本插件以 `builtin` 优先级追加阅读器，**不替换内置默认阅读器**。Markdown 搜索显示完整源文，包含标记语法，不是排版后预览中的高亮。PDF 搜索读取全部页面文字，按单页适宽显示命中页。
 
-已通过 Harness `plugin_manager install_bundle` 安装此目录；输出为 `application: applied`、`warnings: []`。
+## 开发与构建
 
-在本目录：
+本项目的依赖版本由 [package-lock.json](package-lock.json) 锁定。使用已安装的 Node.js 和 npm，在仓库目录执行：
 
 ```powershell
-npm.cmd install --ignore-scripts --no-audit --no-fund
-npm.cmd run build
-npm.cmd test
+npm ci --ignore-scripts --no-audit --no-fund
+npm run build
+npm test
 node --check client.js
 ```
 
-构建把 PDF.js、Worker、CMap、标准字体全部嵌入本地 client.js，不使用远端 CDN。构建依赖仅 devDependencies，运行不安装 React 副本。插件在 ModuleLoader factory 内使用 Harness 提供的 React，并仅向公开 documentPreviews 和 sidebar.right.tab.document 注册新阅读器。没有修改 app.asar，没有访问或注入内置组件 DOM。
+先构建再测试。构建会生成浏览器 bundle 和本地 PDF 字体/CMap 数据。PDF.js、Worker 与支持资源全部内嵌，不使用 CDN，也不另装 React 运行时。
 
-修改已安装的 JS 后需按 Harness 插件更新流程重新应用并重启/刷新确认模块代际；不要把文件已变或相同 slot id 当作页面代码已更新的证据。
+源码入口：[Client](src/client.cjs)、[搜索算法](src/search.mjs)、[样式](src/style.css)、[构建脚本](build.mjs)。
 
-## 测试与已知限制
+## 安装与升级
 
-- 9 项 Node 测试全部通过：真实两页 PDF 提取/页号/不转移源 buffer、中文跨 span、emoji UTF-16 偏移、字面正则符号、大小写折叠、完整大 Markdown 尾部、UTF-8/UTF-16/BOM/无效编码、旋转/UserUnit/CSS rounding 静态契约和本地中文 CMap/字体资源。
-- 0.1.1 已经正式 remove_bundle 后重新 install_bundle，返回 `application: applied`、`warnings: []`。Host 安装状态已更新；没有浏览器刷新控制，建议刷新当前 Harness 页面以确保使用最新 Client 模块。
-- 构建成功，Host 和 Client JS 语法检查通过。中英 metadata 和原创 SVG 图标检查通过。
-- 没有可用浏览器控制，未验证实际点击、canvas/文本层视觉对齐、浅深色显示、图标在管理器里的渲染或浏览器控制台。实时注册验证由主会话进行并在最终报告说明。
-- 扫描 PDF 需要 OCR；本插件不进行 OCR。加密 PDF 提示使用内置阅读器或解密副本。
-- PDF 搜索基于 PDF.js 的提取顺序和文本，不跨页或换行模糊匹配；异常字体编码、复杂排版和图片文字可能不能正确提取。使用 PDF.js 的 JS 图像解码，特殊图像格式可能无法显示；可切回内置阅读器。
-- 未实现注释/表单/签名交互、缩放控件、全文结果虚拟列表或 OCR；完整原阅读体验由保留的内置阅读器提供。
-- 完整建立索引后才展示结果；超大文档/高频单字查询可能耗时或卡顿，当前无静默截断、匹配上限或部分全文误报。
+在 Harness 中通过 `plugin_manager` 安装本项目的绝对目录：
 
-第三方许可见 THIRD-PARTY-NOTICES.txt；图标为本项目原创。
+```json
+{"action":"install_bundle","target":"D:\\xuyl\\tool\\DSH\\dsh-document-search"}
+```
+
+0.2.0 是旧包 `@local/dsh-document-body-search` 的命名迁移：应先通过插件管理器移除旧包，再安装新包，避免两个阅读器重复注册。原始文档不会被修改。
+
+重新构建不会保证已打开页面立刻加载新代码。更新时遵循插件管理器返回的 `application` 和 `warnings`；如提示先移除再安装，使用官方管理流程。完成后刷新整个 Harness 页面，并重新选择搜索阅读器。包名迁移后原有标签页可能恢复内置阅读器，这是预期行为。
+
+## Git 管理
+
+- `main`：日常开发分支。
+- `v0.1.2`：改名前、已修复 PDF Worker 的基线快照。
+- `v0.2.0`：统一命名后的版本。
+- Git 跟踪源码、测试、文档、图标、包清单、依赖锁文件和第三方许可。
+- [忽略规则](.gitignore) 排除依赖目录、生成的浏览器 bundle、内嵌 PDF 资源以及本地临时文件。新克隆或切换版本后应重新构建。
+
+```powershell
+git status
+git log --oneline --decorate
+git diff v0.1.2..v0.2.0
+git switch -c feature/my-change
+```
+
+尚未设置远程地址，也没有推送到任何平台。使用 Harness Git 工作台时可选择本项目目录作为仓库。
+
+## 验证与限制
+
+自动测试涵盖真实两页 PDF 文字提取、页号关联、中文跨 span 匹配、UTF-16/emoji 偏移、字面量匹配、大小写选项、长 Markdown 文末搜索、编码错误处理、本地 CMap/字体、PDF 旋转/UserUnit/CSS rounding 契约，以及 **Worker 文本打包后作为 ES 模块加载**。命名迁移也有包名、模块 ID、注册标识与语言资源一致性测试。
+
+0.1.2 修复了把模块对象当作 Worker 源码的问题，用户已确认该版本 PDF 可以正常显示。自动测试不等于完整浏览器视觉验证；复杂 PDF 的文本层对齐和主题显示仍需实看。
+
+- 文件完整读取受 Harness Host 文件大小限制，读取失败会明确报错，不把部分内容当全文。
+- 扫描 PDF 需要先 OCR；本插件不执行 OCR。加密 PDF 请使用合适的外部阅读器或解密副本。
+- PDF 基于提取后的文字进行字面量搜索，不进行跨页/跨换行模糊匹配；异常字体、复杂排版和图片文字可能无法正确提取。
+- 不提供注释、表单、签名交互或缩放控件；需要完整阅读体验时切回内置或外部阅读器。
+- 超大文档、高频单字匹配可能耗时或卡顿；未实现结果虚拟化。
+
+第三方许可见 [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt)。插件图标为原创，命名迁移沿用原图标。

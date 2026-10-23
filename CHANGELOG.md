@@ -1,0 +1,23 @@
+# 更新记录
+
+## 0.2.0
+
+- 统一插件名称为“文档搜索 / Document Search”。
+- 包名、ModuleLoader ID、Loader 行 ID 和文档阅读器 ID 统一使用 `dsh-document-search`。
+- 源码迁移到独立的同名项目目录，使用 Git `main` 分支管理。
+- 添加改名前基线和命名迁移的提交记录与版本标签，排除依赖和可再生成的大型构建文件。
+- 同步依赖锁文件、安装说明、使用入口说明及命名一致性测试。
+- 保留 0.1.2 已修复的 PDF Worker 和现有 PDF/Markdown 搜索行为。
+
+## 0.1.2
+
+- 修复 PDF Worker 文本导入错误：正确读取 `.mjs` 文本模块的默认导出，避免将 `[object Object]` 当作 JavaScript 加载。
+- 增加 Worker 打包后模块加载回归测试；用户确认 PDF 恢复显示。
+
+## 0.1.1
+
+- 修复 PDF 旋转、UserUnit 和 CSS rounding 的文本层定位契约。
+
+## 0.1.0
+
+- 初版当前文档搜索：PDF 全文搜索和 Markdown 源文搜索。

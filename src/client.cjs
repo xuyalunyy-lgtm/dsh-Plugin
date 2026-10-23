@@ -9,7 +9,7 @@ const zh = require('../locale/zh.json');
 const en = require('../locale/en.json');
 const h = React.createElement;
 const {useState, useEffect, useMemo, useRef} = React;
-const ID = '@local/dsh-document-body-search';
+const ID = 'dsh-document-search';
 function asset(name) {
   const raw = assets[name];
   if (!raw) throw new Error('Missing local PDF asset: ' + name);
@@ -122,11 +122,11 @@ module.exports={inject:['slots','documentPreviews','locale'],apply(ctx){
     pdfjs.GlobalWorkerOptions.workerSrc=url;
     return ()=>URL.revokeObjectURL(url);
   });
-  ctx.effect(()=>ctx.locale.register('documentBodySearch','en',en.ui));
-  ctx.effect(()=>ctx.locale.register('documentBodySearch','zh',zh.ui));
-  const t=ctx.locale.bind('documentBodySearch');
+  ctx.effect(()=>ctx.locale.register('documentSearch','en',en.ui));
+  ctx.effect(()=>ctx.locale.register('documentSearch','zh',zh.ui));
+  const t=ctx.locale.bind('documentSearch');
   for(const [suffixes,isPdf,id,label] of [[['pdf'],true,ID+'/pdf','pdfTitle'],[['md','markdown','mdown'],false,ID+'/md','mdTitle']]){
     ctx.effect(()=>ctx.documentPreviews.register({id,extensions:suffixes,...(isPdf?{binaryExtensions:['pdf']}:{}),priority:'builtin',title:()=>t(label),loading:'bytes-complete',wrap:false}));
-    ctx.effect(()=>ctx.slots.inject('sidebar.right.tab.document',()=>ctx.slots.register({name:'sidebar.right.tab.document',key:id,locale:'documentBodySearch'},props=>h(Reader,{...props,isPdf}))));
+    ctx.effect(()=>ctx.slots.inject('sidebar.right.tab.document',()=>ctx.slots.register({name:'sidebar.right.tab.document',key:id,locale:'documentSearch'},props=>h(Reader,{...props,isPdf}))));
   }
 }};
