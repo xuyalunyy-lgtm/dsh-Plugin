@@ -5,6 +5,7 @@ const workerSource = require('pdfjs-dist/build/pdf.worker.mjs').default;
 const assets = require('./pdf-assets.json');
 const {findMatches, pdfPageText, intersections, decodeMarkdown} = require('./search.mjs');
 const {matchPosition, nextMatchIndex, matchJumpTarget, isComposingKey} = require('./match-navigation.mjs');
+const {RESULTS_PAGE_SIZE, buildLineStarts, createResultPage, listScrollForItem} = require('./result-list.mjs');
 const css = require('./style.css');
 const zh = require('../locale/zh.json');
 const en = require('../locale/en.json');
@@ -68,16 +69,40 @@ function PdfPage({doc, pageNumber, record, matches, active, reveal, t}) {
   },[record,matches,active,ready,reveal]);
   return h('div',{ref:shell,className:'dbs-pdf-shell'},error&&h('p',{role:'alert'},t('renderError')+' '+error),h('div',{className:'dbs-pdf-page'},h('canvas',{ref:canvas,'aria-label':t('page')+' '+pageNumber}),h('div',{ref:layer,className:'dbs-textLayer'})));
 }
+function ResultList({listing,current,t,onSelect}) {
+  const list=useRef(null), previous=useRef({listing:null,current:null});
+  useEffect(()=>{
+    const node=list.current;if(!node)return;
+    // Identity also changes for a new query on the same batch/current ordinal.
+    const listingChanged=previous.current.listing!==listing;
+    if(listingChanged)node.scrollTop=0;
+    if(listingChanged||previous.current.current!==current){
+      const selected=node.querySelector('[aria-current="true"]');
+      if(selected)node.scrollTop=listScrollForItem(node.scrollTop,node.clientHeight,selected.offsetTop,selected.offsetHeight);
+    }
+    previous.current={listing,current};
+  },[current,listing]);
+  return h('ol',{ref:list,className:'dbs-result-list',start:listing.from},listing.items.map(item=>{
+    const location=item.line===undefined?t('resultPage',{page:item.page}):t('resultLine',{line:item.line});
+    return h('li',{key:item.index},h('button',{
+      type:'button',className:'dbs-result-item','aria-current':item.index===current?'true':undefined,
+      onClick:()=>onSelect(item.index)
+    },h('span',{className:'dbs-result-location'},t('resultOrdinal',{ordinal:item.ordinal})+' · '+location),
+      h('span',{className:'dbs-result-snippet'},item.leadingEllipsis?'…':'',item.before,
+        h('mark',null,item.match,item.matchTruncated?'…':''),item.after,item.trailingEllipsis?'…':'')));
+  }));
+}
 function Reader({content,resourceAddress,scrollportRef,isPdf,t}) {
   const [query,setQuery]=useState(''),[sensitive,setSensitive]=useState(false),[current,setCurrent]=useState(0),[page,setPage]=useState(1);
   const [state,setState]=useState({loading:true,pages:[],doc:null,error:''});
   const [jumpValue,setJumpValue]=useState(''),[jumpError,setJumpError]=useState(''),[reveal,setReveal]=useState(0);
+  const [listExpanded,setListExpanded]=useState(false),[listPage,setListPage]=useState(0);
   const scroll=useRef(null), input=useRef(null), jumpComposing=useRef(false);
-  const jumpErrorId=React.useId();
+  const jumpErrorId=React.useId(), resultListId=React.useId();
   const data=content.kind==='bytes'?content.data:null;
   useEffect(()=>{
     let disposed=false,task;
-    setQuery('');setCurrent(0);setPage(1);setState({loading:true,pages:[],doc:null,error:''});
+    setQuery('');setCurrent(0);setPage(1);setListExpanded(false);setListPage(0);setState({loading:true,pages:[],doc:null,error:''});
     (async()=>{
       if(!data)throw new Error(t('bytesRequired'));
       if(!isPdf){const text=decodeMarkdown(data);if(!disposed)setState({loading:false,pages:[{text}],doc:null,error:''});return;}
@@ -97,15 +122,17 @@ function Reader({content,resourceAddress,scrollportRef,isPdf,t}) {
   const results=useMemo(()=>state.pages.flatMap((p,i)=>findMatches(p.text,query,sensitive).map(m=>({...m,page:i+1}))),[state.pages,query,sensitive]);
   const pageMatches=useMemo(()=>results.filter(m=>m.page===page),[results,page]);
   const position=matchPosition(query,results.length,current,state);
+  const markdownLineStarts=useMemo(()=>isPdf?undefined:buildLineStarts(state.pages[0]?.text||''),[state.pages,isPdf]);
+  const listing=useMemo(()=>listExpanded&&position.status==='matched'?createResultPage(state.pages,results,listPage,{isPdf,lineStarts:markdownLineStarts}):null,[listExpanded,position.status,state.pages,results,listPage,isPdf,markdownLineStarts]);
   const active=position.status==='matched'?results[position.current-1]:undefined;
   const pageActive=active?.page===page?pageMatches.indexOf(active):-1;
   const changeQuery=value=>{setQuery(value);setCurrent(0);};
-  useEffect(()=>{if(results[0])setPage(results[0].page);setCurrent(0);setJumpValue('');setJumpError('');jumpComposing.current=false;},[results]);
+  useEffect(()=>{if(results[0])setPage(results[0].page);setCurrent(0);setJumpValue('');setJumpError('');setListPage(0);jumpComposing.current=false;},[results]);
   useEffect(()=>{if(!isPdf)scroll.current?.querySelector('[data-active="true"]')?.scrollIntoView({block:'nearest',inline:'nearest'});},[current,results,isPdf,reveal]);
   const counterText=position.status==='matched'?t('matchCount',{current:position.current,total:position.total}):t({idle:'idle',empty:'noMatches',loading:'indexing',error:'searchUnavailable'}[position.status]);
   // All match navigation shares the same current-item and PDF-page update.
   // A reveal revision also repositions an already-selected match after manual scrolling.
-  const selectMatch=index=>{const target=results[index];if(!target)return;setCurrent(index);setPage(target.page);setReveal(value=>value+1);};
+  const selectMatch=index=>{const target=results[index];if(!target)return;setCurrent(index);setPage(target.page);setListPage(Math.floor(index/RESULTS_PAGE_SIZE));setJumpError('');setReveal(value=>value+1);};
   const move=delta=>{if(!results.length)return;setJumpError('');selectMatch(nextMatchIndex(current,delta,results.length));};
   const jump=()=>{
     if(jumpComposing.current||position.status!=='matched')return;
@@ -132,8 +159,16 @@ function Reader({content,resourceAddress,scrollportRef,isPdf,t}) {
         onCompositionStart:()=>{jumpComposing.current=true;},onCompositionEnd:()=>{jumpComposing.current=false;},
         onKeyDown:e=>{if(e.key==='Enter'&&!isComposingKey(e,jumpComposing.current)){e.preventDefault();e.stopPropagation();jump();}}
       })),button(t('jumpButton'),jump,position.status!=='matched'),
+      h('button',{type:'button','aria-expanded':listExpanded,'aria-controls':resultListId,disabled:position.status!=='matched'&&!listExpanded,onClick:()=>{if(!listExpanded)setListPage(Math.floor(Math.max(0,position.current-1)/RESULTS_PAGE_SIZE));setListExpanded(!listExpanded);}},t(listExpanded?'hideResults':'showResults')),
       isPdf&&position.status==='matched'&&active&&h('span',{className:'dbs-match-page'},t('matchPage',{page:active.page})),
       jumpError&&h('span',{id:jumpErrorId,className:'dbs-jump-error',role:'alert'},t(jumpError,{total:position.total}))),
+    listExpanded&&h('section',{id:resultListId,className:'dbs-result-panel','aria-label':t('resultsTitle')},
+      listing?h(React.Fragment,null,h('div',{className:'dbs-toolbar'},
+        h('span',{'aria-live':'polite'},t('resultRange',{from:listing.from,to:listing.to,total:listing.total})),
+        button(t('previousResults'),()=>setListPage(listing.page-1),listing.page===0),
+        button(t('nextResults'),()=>setListPage(listing.page+1),listing.page+1>=listing.pageCount)),
+        h(ResultList,{listing,current:position.current-1,t,onSelect:selectMatch})):
+        h('p',{className:'dbs-note'},counterText)),
     isPdf&&state.pages.length>0&&h('div',{className:'dbs-toolbar'},button('‹',()=>setPage(p=>Math.max(1,p-1)),page<=1),h('label',null,t('page'),h('input',{type:'number',min:1,max:state.pages.length,value:page,onChange:e=>{const n=Number(e.target.value);if(Number.isInteger(n)&&n>=1&&n<=state.pages.length)setPage(n);}})),h('span',null,' / '+state.pages.length),button('›',()=>setPage(p=>Math.min(state.pages.length,p+1)),page>=state.pages.length)),
     h('p',{className:'dbs-note'},t(isPdf?'pdfNote':'mdNote')),
     h('div',{className:'dbs-scroll',ref},
