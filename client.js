@@ -57,7 +57,15 @@ window.__ModuleLoader__.load({
         publish({state:result.state,error:'',clock:Date.now(),serverOffset:result.state.now-Date.now()});if(!dead)notify(result.state);return result.state;
       }
       function act(action,args={}) {
-        const run=queue.then(async()=>{publish({busy:true});try{return await request({action,...args});}catch(e){publish({error:e.message});return null;}finally{publish({busy:false});}});
+        // Polling must not disable a focused input: disabled controls lose focus.
+        // Keep reads serialized with writes, but reserve busy for actual mutations.
+        const mutating=action!=='read';
+        const run=queue.then(async()=>{
+          if(mutating)publish({busy:true});
+          try{return await request({action,...args});}
+          catch(e){publish({error:e.message});return null;}
+          finally{if(mutating)publish({busy:false});}
+        });
         queue=run.catch(()=>{}); return run;
       }
       const useStore=()=>{React.useSyncExternalStore(f=>ctx.locale.subscribe(f),()=>ctx.locale.getSnapshot());return React.useSyncExternalStore(subscribe,()=>snapshot);};
