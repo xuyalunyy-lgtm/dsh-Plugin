@@ -23,6 +23,34 @@ function deferred() {
 const flush = () => new Promise(resolve => setImmediate(resolve));
 const busyChanges = patches => patches.filter(p => 'busy' in p).map(p => p.busy);
 
+const requestStart = source.indexOf('      async function request(input){');
+assert.ok(requestStart >= 0 && requestStart < start);
+const requestSource = source.slice(requestStart, start);
+function requestHarness() {
+  const patches=[];
+  const state={tasks:[],alerts:[],now:Date.now()};
+  const context=vm.createContext({
+    fetch:async()=>({ok:true,json:async()=>({ok:true,state})}),
+    abort:{signal:undefined},publish:patch=>patches.push({...patch}),dead:false,notify:()=>{},
+  });
+  return {request:vm.runInContext(`${requestSource}; request`,context),patches};
+}
+
+test('successful polling updates state without clearing a failed task operation', async () => {
+  const {request,patches}=requestHarness();
+  await request({action:'read'});
+  assert.ok(patches[0].state);
+  assert.equal(patches[0].syncError,'');
+  assert.equal('error' in patches[0],false);
+});
+
+test('successful mutation clears its own error independently from sync status', async () => {
+  const {request,patches}=requestHarness();
+  await request({action:'add',date:'2026-10-23',title:'test'});
+  assert.equal(patches[0].error,'');
+  assert.equal('syncError' in patches[0],false);
+});
+
 test('background reads never disable form controls, including while awaiting the response', async () => {
   const response = deferred();
   const { act, patches } = harness(() => response.promise);
@@ -40,7 +68,7 @@ test('failed reads report an error without toggling input availability', async (
   const { act, patches } = harness(async () => { throw new Error('offline'); });
   assert.equal(await act('read'), null);
   assert.deepEqual(busyChanges(patches), []);
-  assert.equal(patches.at(-1).error, 'offline');
+  assert.equal(patches.at(-1).syncError, 'offline');
 });
 
 test('writes still disable duplicate submission and release controls after failure', async () => {

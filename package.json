@@ -1,6 +1,6 @@
 {
   "name": "dsh-focus-calendar",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "专注日历：每日待办、专注计时、护眼与活动提醒",
   "private": true,
   "type": "module",

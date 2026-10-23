@@ -24,6 +24,76 @@ test('defaults stopped and task CRUD validates calendar dates and times', () => 
   assert.equal(state.tasks.length, 0);
 });
 
+test('date-only updates move tasks across month, year and leap-day boundaries without changing other fields', () => {
+  const moves = [
+    ['2026-01-31', '2026-02-01'],
+    ['2026-03-01', '2026-02-28'],
+    ['2026-12-31', '2027-01-01'],
+    ['2027-01-01', '2026-12-31'],
+    ['2024-02-28', '2024-02-29'],
+    ['2024-02-29', '2024-03-01'],
+    ['2000-03-01', '2000-02-29'],
+  ];
+  for (const [from, to] of moves) {
+    for (const [done, time] of [[false, ''], [true, '23:59']]) {
+      let original = step(initialState(), { action: 'add', date: from, title: 'Move this task', time });
+      const taskId = original.tasks[0].id;
+      original = step(original, { action: 'update', id: taskId, done });
+      const before = structuredClone(original);
+      const moved = step(original, { action: 'update', id: taskId, date: to });
+      assert.deepEqual(moved.tasks, [{ ...before.tasks[0], date: to }], `${from} -> ${to}, done=${done}`);
+      assert.deepEqual(original, before, 'moving must not mutate the caller-owned state');
+      assert.deepEqual({ ...moved, tasks: [] }, { ...before, tasks: [] }, 'unrelated state must survive');
+    }
+  }
+});
+
+test('moving a task preserves all existing source and destination tasks, even with duplicate titles', () => {
+  const source = '2026-12-31', destination = '2027-01-01';
+  let original = initialState();
+  for (const [date, title, time] of [
+    [source, 'Same title', '08:00'],
+    [source, 'Same title', '09:30'],
+    [source, 'Source neighbour', ''],
+    [destination, 'Same title', '09:30'],
+    [destination, 'Destination neighbour', '18:00'],
+  ]) original = step(original, { action: 'add', date, title, time });
+  const taskId = original.tasks[1].id;
+  original = step(original, { action: 'update', id: taskId, done: true });
+  const before = structuredClone(original);
+  const moved = step(original, { action: 'update', id: taskId, date: destination });
+  assert.deepEqual(moved.tasks, before.tasks.map(task => task.id === taskId ? { ...task, date: destination } : task));
+  assert.deepEqual(moved.tasks.filter(task => task.date === source), before.tasks.filter(task => task.date === source && task.id !== taskId));
+  assert.equal(moved.tasks.filter(task => task.date === destination).length, 3);
+  assert.equal(new Set(moved.tasks.map(task => task.id)).size, before.tasks.length);
+  assert.deepEqual(original, before);
+  assert.deepEqual(step(moved, { action: 'update', id: taskId, date: destination }), moved, 'moving to the same day is idempotent');
+});
+
+test('invalid move dates leave original and persisted state unchanged and never save a partial update', async () => {
+  let original = step(initialState(), { action: 'add', date: '2024-02-29', title: 'Keep me', time: '12:34' });
+  const taskId = original.tasks[0].id;
+  original = step(original, { action: 'update', id: taskId, done: true });
+  original = step(original, { action: 'add', date: '2026-03-01', title: 'Keep neighbour' });
+  const before = structuredClone(original);
+  let stored = structuredClone(original), writes = 0;
+  const controller = createController({ load: () => stored, save: async next => { stored = next; writes++; }, clock: () => 1000, id });
+  try {
+    for (const date of ['2023-02-29', '1900-02-29', '2100-02-29', '2024-02-30', '2026-04-31', '2026-00-01', '2026-13-01', '2026-01-00', '2026-01-32', '2026-1-01', '2026-01-01T00:00:00Z', '', 'garbage', null, 20260101]) {
+      const request = { action: 'update', id: taskId, date, title: 'Must not leak', time: '00:01', done: false };
+      assert.throws(() => step(original, request), /日期须为有效 YYYY-MM-DD/);
+      assert.deepEqual(original, before, `invalid move ${String(date)} must not mutate input`);
+      const result = await controller.dispatch(request);
+      assert.equal(result.ok, false);
+      assert.match(result.error, /日期须为有效 YYYY-MM-DD/);
+      assert.deepEqual(stored, before, `invalid move ${String(date)} must not affect persistence`);
+      assert.equal(writes, 0);
+    }
+  } finally {
+    await controller.close();
+  }
+});
+
 test('focus pause/resume excludes paused wall time and expires exactly once', () => {
   let state = step(initialState(), { action: 'focusStart' }, 1000);
   assert.equal(state.focus.endsAt, 1501000);
