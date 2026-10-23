@@ -87,18 +87,18 @@ test('preview and global layers use the same enable and opacity rules', () => {
 });
 test('reset all is guarded by an explicit confirmation action', () => {
   assert.match(source, /button\('resetAll', \(\) => \{ saves.flush\(\); setConfirming\(true\); \}/);
-  assert.match(source, /button\('confirmReset', \(\) => \{ generation.current\+\+; change\(defaults\)/);
+  assert.match(source, /button\('confirmReset',[^\n]*model.action\('reset'\)/);
   assert.match(source, /button\('cancel', closeConfirmation/);
 });
-test('external storage refresh reads current authority and invalidates image decoding', () => {
-  assert.doesNotMatch(source, /JSON.parse\(event.newValue/);
-  assert.match(source, /const next = sanitize\(JSON.parse\(localStorage.getItem\(KEY\)/);
-  assert.match(source, /externalRevision\+\+/);
+test('Host revision replaces browser authority and invalidates image decoding', () => {
+  assert.doesNotMatch(source, /localStorage.setItem/);
+  assert.match(source, /expectedRevision: revision/);
+  assert.match(source, /externalRevision = view.epoch/);
   assert.match(source, /sourceRevision !== externalRevision/);
 });
 test('page, visibility and component cleanup flush queued settings', () => {
   assert.match(source, /addEventListener\('pagehide', flush\)/);
   assert.match(source, /removeEventListener\('pagehide', flush\)/);
   assert.match(source, /generation.current\+\+; saves.flush\(\);/);
-  assert.match(source, /state = savedState; saveStatus = 'failed'/);
+  assert.match(source, /value = saved; status = error\?\.code === 'CONFLICT'/);
 });

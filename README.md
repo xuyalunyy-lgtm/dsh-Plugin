@@ -23,11 +23,24 @@
 
 ## 存储与隐私
 
-图片读取与解码均在浏览器完成，无网络请求、无服务器上传。个人外观偏好与图片作为插件自己的展示状态存储在当前 origin 的 localStorage（键 `dsh.qinglan.presentation.v1`），不修改会话或 Host 配置。浏览器清理站点数据或更换端口、浏览器后不保证保留。不进行跨设备同步。同 origin 的页面通过 storage 事件同步。存储失败会提示并保留上一次成功状态。
+从 1.3.0 起，图片与设置通过已认证的 Harness Connection 接口保存到当前 Host 的 `local-qinglan-theme` 存储域，不再以页面端口下的 localStorage 作为权威来源。默认持久性由 Host 配置的 storageDomain 后端提供，切换浏览器、清理页面数据或改变端口不会删除 Host 已保存的数据。同一 Host 上的已授权页面共享外观，不是每个浏览器的私有设置。图片不发送到第三方，但会传到你连接的 Harness Host；远程部署请使用 HTTPS。
 
-安装是当前 Harness profile 级别，背景偏好则是浏览器本地级别。禁用插件会释放颜色覆盖和 slot 注册，恢复宿主外观；本地偏好保留供下次启用。
+图片以内容哈希分开存储，偏好只引用图片 ID。修改普通参数不会重新上传图片。每次写入都校验 revision，并发冲突会拒绝写入并重新读取，避免无提示覆盖。页面聚焦/重新可见或点击「重新读取 Host 设置」时刷新，不承诺即时跨页面推送。保存失败时显示错误；等待「已保存到 Host」再关闭页面。突然退出或网络中断可能丢失未确认的修改。
 
-## 1.2.0 设置体验优化
+旧版迁移：若当前页面 origin 能读取旧键 `dsh.qinglan.presentation.v1`，且 Host 尚未初始化，显示「迁移此浏览器的旧设置」。迁移需点击确认，不删除旧副本、不覆盖已有 Host 设置。浏览器不能读取其他端口的 localStorage；旧数据只能在原来源页面可访问时迁移，不能声称自动找回所有历史端口数据。
+
+禁用插件会释放配色覆盖和 slot 注册，恢复宿主外观；Host 数据仍保留。所有请求使用 Harness 的认证及 Host/Origin 检查，不另建公开文件服务器。工具 `qinglan_theme` 与 UI 调用同一仓库操作，read 返回 revision，update/reset 使用 expectedRevision。
+
+## 1.3.0 Host 持久存储
+
+- 使用已发现的 `storageDomain` 和已认证 Connection Fetch 接口，图片和参数分离。
+- 显式迁移当前 origin 的旧偏好，不覆盖已有 Host 数据。
+- Host 串行提交、版本冲突检测，Client 合并拖动并按序提交；并发刷新合并为同一个读取请求。
+- Agent 工具与 UI 共用同一仓库，响应不包含背景图片内容。
+- 图像校验包含规范 Base64、3 MiB 上限及 MIME 魔数，不替代完整图像解码；浏览器上传还会解码检查。
+- 存储单次提交失败保留旧文档，未引用的图片在后续成功提交后尽力清理。
+
+## 1.2.0 设置体验优化（历史实现）
 
 - 主题与背景分区展示，顶部显示当前配色及版本；主题卡片预留选中标记位置。
 - 默认效果预览与全局背景共用渲染逻辑，附示例文字，并支持切换原图。
@@ -57,7 +70,7 @@
 
 ## 实现与验证
 
-- 无 npm 运行时依赖，无安装脚本，无编译步骤。
+- Host 使用锁定的 Zod 4.1.12 校验存储记录；无安装脚本，无编译步骤。开发测试先运行 `npm ci --ignore-scripts`，然后 `node --test test/*.test.mjs`。
 - React 使用 Harness 模块加载器提供的实例。
 - 使用已发现的 `theme.overrideTokens`、`settings.section`、`shell.overlay` 与 locale 服务。
 - 自定义 token 层提供 light/dark 两组值，使所选固定配色在宿主深浅模式中一致。

@@ -37,7 +37,13 @@ window.__ModuleLoader__.load({
       resetParameters: '重置背景参数（保留图片）', resetAll: '恢复全部默认设置',
       resetWarning: '将恢复青岚配色，并移除已保存的背景图。此操作不可撤销。',
       confirmReset: '确认恢复并移除图片', cancel: '取消', resetHelp: '仅重置显现度、模糊、铺放和纹理，不改变配色或图片。',
-      rawEmpty: '尚未选择背景图片', version: '版本 1.2.0',
+      rawEmpty: '尚未选择背景图片', version: '版本 1.3.0',
+      refresh: '重新读取 Host 设置', migrate: '迁移此浏览器的旧设置',
+      migrationHint: '检测到当前页面来源下的旧设置。点击迁移后存入 Host；不会删除旧副本，也不会覆盖已有 Host 设置。其他旧端口的数据需要回到对应页面迁移。',
+      loading: '正在读取 Host 设置…', saving: '正在保存到 Host，请等待完成后关闭页面…', saved: '已保存到 Host',
+      conflict: '其他页面已修改设置，本次修改未覆盖它；已重新读取，请重试。',
+      failed: 'Host 读取或保存失败，请检查连接后重新读取。未确认保存成功前请勿关闭页面。',
+      privacy: '图片与设置持久保存到当前 Harness Host，不发送给第三方；同一 Host 的已授权页面共享外观。支持 PNG/JPEG/WebP，最大 3 MiB。',
     });
     Object.assign(dictionaries.en, {
       current: 'Current palette', previewMode: 'Preview mode', effect: 'Applied effect', original: 'Original image',
@@ -47,7 +53,13 @@ window.__ModuleLoader__.load({
       resetParameters: 'Reset background controls (keep image)', resetAll: 'Restore all defaults',
       resetWarning: 'This restores the Sage palette and removes the saved background image. This cannot be undone.',
       confirmReset: 'Restore and remove image', cancel: 'Cancel', resetHelp: 'Resets visibility, blur, placement and texture only. Keeps your palette and image.',
-      rawEmpty: 'No background image selected', version: 'Version 1.2.0',
+      rawEmpty: 'No background image selected', version: 'Version 1.3.0',
+      refresh: 'Reload Host preferences', migrate: 'Migrate this browser’s old settings',
+      migrationHint: 'Old settings were found for this page origin. Migration preserves the old copy and never replaces initialized Host settings. Other ports require migration from their own pages.',
+      loading: 'Loading Host preferences…', saving: 'Saving to Host; wait before closing…', saved: 'Saved to Host',
+      conflict: 'Another page changed these settings. Your write was not applied; the latest state was loaded. Please retry.',
+      failed: 'Host read/save failed. Check the connection and reload. Wait for saved confirmation before closing.',
+      privacy: 'Images and preferences are stored on this Harness Host, not a third party. Authorized pages sharing this Host share appearance. PNG/JPEG/WebP, up to 3 MiB.',
     });
     function sanitize(value) {
       const v = value && typeof value === 'object' ? value : {};
@@ -81,6 +93,73 @@ window.__ModuleLoader__.load({
       }
       return { enqueue, flush, discard };
     }
+    // Pure asynchronous Host state machine, exercised without a browser in tests.
+    function createRemotePreferences({ request, materialize, initial, changed, schedule, cancel }) {
+      let value = initial, saved = initial, remote = null, revision = 0;
+      let ready = false, status = 'loading', epoch = 0, sequence = 0, disposed = false;
+      let tail = Promise.resolve(), loadingTask = null;
+      const snapshot = () => ({ value, remote, revision, ready, status, epoch });
+      const publish = () => { if (!disposed) changed(snapshot()); };
+      function adopt(result) {
+        remote = result; revision = result.revision; saved = materialize(result);
+        value = saved; ready = true;
+      }
+      function serial(operation) {
+        const task = tail.then(operation);
+        tail = task.catch(() => false);
+        return tail;
+      }
+      async function recover(error) {
+        epoch++; sequence++; saves.discard(); ready = false;
+        value = saved; status = error?.code === 'CONFLICT' ? 'conflict' : 'failed';
+        try { adopt(await request({ action: 'read' })); } catch { /* No mutation until authority is readable. */ }
+        publish(); return false;
+      }
+      function commit(job) {
+        return serial(async () => {
+          if (job.epoch !== epoch) return false;
+          status = 'saving'; publish();
+          const payload = { action: job.action, expectedRevision: revision, ...job.extra };
+          if (job.action === 'update') {
+            payload.patch = { ...job.next };
+            if (payload.patch.image === saved.image) delete payload.patch.image;
+          }
+          try {
+            const result = await request(payload);
+            remote = result; revision = result.revision; saved = materialize(result);
+            if (job.sequence === sequence) { value = saved; status = 'saved'; }
+            else status = 'pending';
+            publish(); return true;
+          } catch (error) { return recover(error); }
+        });
+      }
+      const saves = createSaveQueue(commit, schedule, cancel);
+      function update(next, deferred = false) {
+        if (!ready || disposed) return false;
+        value = next; status = 'pending';
+        const job = { action: 'update', next, sequence: ++sequence, epoch };
+        publish(); return saves.enqueue(job, deferred);
+      }
+      function action(name, extra = {}) {
+        if (!ready || disposed) return Promise.resolve(false);
+        saves.flush();
+        const job = { action: name, extra, sequence: ++sequence, epoch };
+        status = 'saving'; publish(); return commit(job);
+      }
+      function load() {
+        if (loadingTask) return loadingTask;
+        if (disposed || status === 'pending' || status === 'saving') return tail;
+        ready = false; status = 'loading'; publish();
+        loadingTask = serial(async () => {
+          try { const result = await request({ action: 'read' }); if (result.revision !== revision) epoch++; adopt(result); status = ''; publish(); return true; }
+          catch (error) { ready = false; status = 'failed'; publish(); return false; }
+        }).finally(() => { loadingTask = null; });
+        return loadingTask;
+      }
+      return { snapshot, update, action, load, flush: () => saves.flush(), idle: () => tail,
+        dispose() { saves.flush(); saves.discard(); disposed = true; },
+      };
+    }
     function backgroundReset() {
       return { opacity: defaults.opacity, blur: defaults.blur, fit: defaults.fit, pattern: defaults.pattern };
     }
@@ -89,6 +168,7 @@ window.__ModuleLoader__.load({
     }
     const css = `.ql-panel{max-width:720px;margin:0 auto;padding:24px;color:var(--dsw-alias-label-primary);font-size:14px;line-height:1.6}.ql-panel *{box-sizing:border-box}.ql-panel h2{font-size:22px;margin:0}.ql-muted{color:var(--dsw-alias-label-secondary);font-size:13px}.ql-card{padding:18px;margin:16px 0;border:1px solid var(--dsw-alias-border-l1);border-radius:16px;background:var(--dsw-alias-bg-layer-1)}.ql-row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin:12px 0}.ql-panel button,.ql-panel select,.ql-upload{font:inherit;border:1px solid var(--dsw-alias-border-l2);border-radius:9px;padding:8px 12px;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-2);cursor:pointer}.ql-panel button[aria-pressed=true]{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}.ql-panel :focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:3px}.ql-panel input{accent-color:var(--dsw-alias-brand-primary)}.ql-panel input[type=range]{width:min(240px,100%)}.ql-swatches{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}.ql-theme-choice{min-width:0;text-align:left;display:flex;flex-direction:column;gap:8px}.ql-theme-art{display:flex;width:100%;height:28px;overflow:hidden;border-radius:6px}.ql-theme-art i{flex:1}.ql-theme-label{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px}.ql-theme-check{font-size:11px;color:var(--dsw-alias-label-secondary)}.ql-preview{height:150px;border-radius:12px;margin:12px 0;border:1px solid var(--dsw-alias-border-l1);overflow:hidden;position:relative;background:var(--dsw-alias-bg-base)}.ql-preview span{position:absolute;bottom:10px;left:12px;padding:4px 8px;border-radius:6px;background:var(--dsw-alias-bg-overlay);max-width:90%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ql-error{color:var(--dsw-alias-state-error-primary)}@media(max-width:540px){.ql-panel{padding:14px}.ql-row{align-items:flex-start}}`;
     const panelCss = `
+      .ql-fields{border:0;margin:0;padding:0;min-width:0}.ql-fields:disabled{opacity:.75}
       .ql-header{padding-bottom:12px;border-bottom:1px solid var(--dsw-alias-border-l1)}
       .ql-header h2{margin-bottom:10px}.ql-enable{display:flex;align-items:center;gap:8px}
       .ql-segments{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}
@@ -109,8 +189,10 @@ window.__ModuleLoader__.load({
         ctx.effect(() => ctx.locale.register(NS, 'en', dictionaries.en));
         ctx.effect(() => ctx.locale.register(NS, 'zh', dictionaries.zh));
         const t = ctx.locale.bind(NS);
-        let state = { ...defaults }, initialError = false;
-        try { state = sanitize(JSON.parse(localStorage.getItem(KEY) || 'null')); } catch { initialError = true; }
+        let state = { ...defaults, enabled: false };
+        let legacy = null;
+        try { const raw = localStorage.getItem(KEY); if (raw) legacy = sanitize(JSON.parse(raw)); } catch { /* Browser storage is optional after migration. */ }
+        let remoteView = { ready: false, status: 'loading', remote: null, epoch: 0 };
         const listeners = new Set();
         const subscribe = fn => { listeners.add(fn); return () => listeners.delete(fn); };
         let disposeTokens = () => {};
@@ -145,48 +227,47 @@ window.__ModuleLoader__.load({
           disposeTokens = ctx.theme.overrideTokens(NS, tokens);
         }
         let externalRevision = 0;
-        let savedState = state;
-        let saveStatus = initialError ? 'failed' : '';
         const notify = () => listeners.forEach(fn => fn());
-        const saves = createSaveQueue(next => {
-          try {
-            localStorage.setItem(KEY, JSON.stringify(next));
-            savedState = next; saveStatus = 'saved'; notify(); return true;
-          } catch {
-            const changed = state.enabled !== savedState.enabled || state.palette !== savedState.palette;
-            state = savedState; saveStatus = 'failed';
+        async function request(input) {
+          const response = await fetch(new URL('api/qinglan-theme', document.baseURI), {
+            method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(input), signal: AbortSignal.timeout(15000),
+          });
+          const result = await response.json();
+          if (!response.ok || !result.ok) throw Object.assign(new Error(result.message || 'Host request failed'), { code: result.code });
+          return result.value;
+        }
+        const model = createRemotePreferences({ request, initial: state,
+          materialize(result) {
+            const next = sanitize({ ...result.state, image: '' });
+            if (result.state.imageId) next.image = new URL(`api/qinglan-theme/image?id=${result.state.imageId}`, document.baseURI).href;
+            return next;
+          },
+          changed(view) {
+            const changed = state.palette !== view.value.palette || state.enabled !== view.value.enabled;
+            state = view.value; remoteView = view; externalRevision = view.epoch;
             if (changed) applyPalette();
-            notify(); return false;
-          }
+            notify();
+          },
         });
+        const saves = { flush: () => model.flush() };
         function update(patch, deferred = false) {
           const next = sanitize({ ...state, ...patch });
-          const changed = next.enabled !== state.enabled || next.palette !== state.palette;
-          state = next; saveStatus = 'pending';
-          if (changed) applyPalette();
-          notify();
-          return saves.enqueue(next, deferred);
+          // Preserve the authenticated Host image URL unless explicitly replaced/removed.
+          if (!Object.hasOwn(patch, 'image')) next.image = state.image;
+          return model.update(next, deferred);
         }
         ctx.effect(() => {
-          applyPalette();
-          const onStorage = event => {
-            if (event.storageArea !== localStorage || (event.key !== KEY && event.key !== null)) return;
-            try {
-              // Storage events are queued snapshots: reconcile against the latest value.
-              const next = sanitize(JSON.parse(localStorage.getItem(KEY) || 'null'));
-              externalRevision++;
-              saves.discard(); state = savedState = next; saveStatus = '';
-              applyPalette(); notify();
-            } catch { /* Keep the last valid preference. */ }
-          };
-          const flush = () => saves.flush();
-          const onVisibility = () => { if (document.visibilityState === 'hidden') flush(); };
-          window.addEventListener('storage', onStorage);
+          model.load();
+          const flush = () => model.flush();
+          const refresh = () => model.load();
+          const onVisibility = () => { if (document.visibilityState === 'hidden') flush(); else refresh(); };
+          window.addEventListener('focus', refresh);
           window.addEventListener('pagehide', flush);
           document.addEventListener('visibilitychange', onVisibility);
           return () => {
-            saves.flush(); saves.discard(); disposeTokens(); listeners.clear();
-            window.removeEventListener('storage', onStorage);
+            model.dispose(); disposeTokens(); listeners.clear();
+            window.removeEventListener('focus', refresh);
             window.removeEventListener('pagehide', flush);
             document.removeEventListener('visibilitychange', onVisibility);
           };
@@ -230,7 +311,9 @@ window.__ModuleLoader__.load({
         function Panel() {
           useLocale();
           const s = useState();
-          const persistedStatus = React.useSyncExternalStore(subscribe, () => saveStatus);
+          const view = React.useSyncExternalStore(subscribe, () => remoteView);
+          const persistedStatus = view.status;
+          const locked = !view.ready || view.status === 'saving';
           const [message, setMessage] = React.useState('');
           const [section, setSection] = React.useState('palette');
           const [preview, setPreview] = React.useState('effect');
@@ -257,6 +340,7 @@ window.__ModuleLoader__.load({
             try {
               const data = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); });
               const image = new Image(); image.src = data; await image.decode();
+              await model.idle();
               if (ticket !== generation.current || sourceRevision !== externalRevision) return;
               change({ image: data, name: file.name });
             } catch { if (ticket === generation.current && sourceRevision === externalRevision) setMessage('decode'); }
@@ -273,12 +357,15 @@ window.__ModuleLoader__.load({
           return h('section', { className: 'ql-panel', 'aria-label': t('title') }, h('style', null, css + panelCss),
             h('div', { className: 'ql-header' },
               h('h2', null, t('title')),
-              h('label', { className: 'ql-enable' }, h('input', { type: 'checkbox', role: 'switch', 'aria-checked': s.enabled, checked: s.enabled, onChange: e => change({ enabled: e.target.checked }) }), t('enabled')),
+              h('label', { className: 'ql-enable' }, h('input', { type: 'checkbox', role: 'switch', 'aria-checked': s.enabled, checked: s.enabled, disabled: locked, onChange: e => change({ enabled: e.target.checked }) }), t('enabled')),
               h('p', { className: 'ql-muted' }, t('current'), '：', t(s.palette), ' · ', t('version')),
               !s.enabled && h('p', { className: 'ql-muted' }, t('inactive')),
               h('div', { className: 'ql-segments', role: 'group', 'aria-label': t('title') },
                 ['palette', 'background'].map(key => button(key, () => selectSection(key), { key, 'aria-pressed': section === key, 'aria-controls': `${instanceId}-content` })))),
-            h('div', { id: `${instanceId}-content` },
+            h('div', { className: 'ql-row' }, button('refresh', () => model.load(), { disabled: view.status === 'pending' || view.status === 'saving' }),
+              legacy && view.ready && !view.remote?.initialized && button('migrate', () => model.action('importLegacy', { patch: legacy }), { disabled: locked })),
+            legacy && view.ready && !view.remote?.initialized && h('p', { className: 'ql-muted' }, t('migrationHint')),
+            h('fieldset', { id: `${instanceId}-content`, className: 'ql-fields', disabled: locked },
             section === 'palette' && h('div', { className: 'ql-card' }, h('h3', null, t('palette')),
               Object.entries(paletteGroups).map(([group, keys]) => h('div', { key: group, role: 'group', 'aria-label': t(group) },
                 h('h4', { className: 'ql-muted' }, t(group)),
@@ -310,14 +397,14 @@ window.__ModuleLoader__.load({
               h('p', { className: 'ql-muted' }, t('resetHelp')),
               h('p', { className: 'ql-muted' }, t('privacy')))),
             h('div', { className: 'ql-footer' },
-              button('resetAll', () => { saves.flush(); setConfirming(true); }, { ref: resetRef, 'aria-expanded': confirming, 'aria-controls': `${instanceId}-reset` }),
+              button('resetAll', () => { saves.flush(); setConfirming(true); }, { ref: resetRef, disabled: locked, 'aria-expanded': confirming, 'aria-controls': `${instanceId}-reset` }),
               confirming && h('div', { id: `${instanceId}-reset`, className: 'ql-confirm', role: 'group', 'aria-label': t('resetAll'),
                 onKeyDown: e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeConfirmation(); } },
               }, h('p', null, t('resetWarning')),
                 h('div', { className: 'ql-segments' },
                   button('cancel', closeConfirmation, { ref: cancelRef }),
-                  button('confirmReset', () => { generation.current++; change(defaults); resetRef.current?.focus(); }))),
-              h('p', { role: 'status', 'aria-live': 'polite', className: status && !['saved', 'pending'].includes(status) ? 'ql-error' : 'ql-muted' }, status ? t(status) : '')));
+                  button('confirmReset', () => { generation.current++; setConfirming(false); setMessage(''); model.action('reset'); resetRef.current?.focus(); }, { disabled: locked }))),
+              h('p', { role: 'status', 'aria-live': 'polite', className: status && !['saved', 'pending', 'saving', 'loading'].includes(status) ? 'ql-error' : 'ql-muted' }, status ? t(status) : '')));
         }
         ctx.slots.inject('shell.overlay', () => ctx.slots.register({ name: 'shell.overlay', id: NS + '-background', order: -100 }, Background));
         ctx.slots.inject('settings.section', () => ctx.slots.register({ name: 'settings.section', id: NS, order: 5, label: () => t('title') }, Panel));
