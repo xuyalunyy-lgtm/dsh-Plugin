@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { GitReader } from './git-core.mjs';
 import { GitActions } from './git-actions.mjs';
+import { OperationJournal } from './operation-journal.mjs';
 import { scanRepositories, selectRepository } from './repository-discovery.mjs';
 
 export const inject = ['connection', 'sessions', 'sandboxPolicy'];
@@ -8,6 +9,14 @@ export const inject = ['connection', 'sessions', 'sandboxPolicy'];
 // Shared across plugin instances/sessions: two aliases of one canonical repository
 // must not perform overlapping writes. Reads remain available while an action runs.
 const busyRepositories = new Set();
+// One host-process journal across plugin/page/session switches. Never persisted;
+// host restart clears history. Only server-validated metadata enters this object.
+const journal = new OperationJournal();
+function finishOperation(id, result) {
+  // Bookkeeping must never turn an already executed mutation into an API failure.
+  // The production clock is Date.now; this is defensive against clock failures.
+  try { journal.finish(id, result); } catch { /* retain running rather than invent an outcome */ }
+}
 let activeRequests = 0;
 const MAX_REQUESTS = 4;
 const ACTION_PARAMETERS = Object.freeze({
@@ -40,7 +49,7 @@ function errorStatus(error) {
 }
 
 export function apply(ctx) {
-  for (const route of ['repositories', 'snapshot', 'diff', 'details', 'action', 'overview', 'preview', 'summary', 'branchMetadata']) ctx.connection.fetch.register({
+  for (const route of ['repositories', 'snapshot', 'diff', 'details', 'action', 'overview', 'preview', 'summary', 'branchMetadata', 'activity']) ctx.connection.fetch.register({
     path: '/api/git-visualizer/' + route,
     methods: ['POST'], requestBody: 'buffered',
     async fetch(request) {
@@ -60,6 +69,14 @@ export function apply(ctx) {
         if (!header) return reply({ error: '会话不存在' }, 404);
         const root = header.cwd ?? ctx.sandboxPolicy.workspaceRoot;
         if (!root) return reply({ error: '会话没有工作区' }, 400);
+        if (route === 'activity') {
+          if (!allowedKeys(body, ['sessionId', 'repository']) || (body.repository !== undefined
+            && (typeof body.repository !== 'string' || !body.repository || body.repository.length > 32768 || body.repository.includes('\0')))) {
+            return reply({ error: '无效操作记录参数' }, 400);
+          }
+          // History can outlive repository removal. Do not discover or run Git.
+          return reply({ records: journal.list({ sessionId: body.sessionId, workspaceRoot: root, repository: body.repository }), persistent: false });
+        }
         if (route === 'action') validateAction(body);
         else if ((route === 'details' || route === 'overview' || route === 'summary' || route === 'branchMetadata') && !allowedKeys(body, ['sessionId', 'repository'])) return reply({ error: '请求包含不允许的参数' }, 400);
         else if (route === 'preview' && (!allowedKeys(body, ['sessionId', 'repository', 'path']) || typeof body.path !== 'string' || !body.path || body.path.length > 4096 || body.path.includes('\0'))) return reply({ error: '无效预览参数' }, 400);
@@ -71,7 +88,22 @@ export function apply(ctx) {
           busyRepositories.add(key);
           try {
             const parameters = Object.fromEntries(['operation', 'expectedHead', 'expectedBranch', ...ACTION_PARAMETERS[body.operation]].map(name => [name, body[name]]));
-            return reply(await new GitActions(repository.path).execute(parameters));
+            // Begin must succeed before executing any mutation; the global request
+            // budget normally makes the journal's four-running limit unreachable.
+            const id = journal.begin({ sessionId: body.sessionId, workspaceRoot: root,
+              repository: repository.id, operation: body.operation,
+              branch: body.branch, fileCount: body.paths?.length });
+            let result;
+            try {
+              result = await new GitActions(repository.path).execute(parameters);
+            } catch (error) {
+              finishOperation(id, error?.uncertain === true
+                ? { status: 'unknown', errorCode: 'OUTCOME_UNKNOWN' }
+                : { status: 'failed', errorCode: error?.code === 'STALE_STATE' ? 'STALE_STATE' : 'GIT_FAILED' });
+              throw error;
+            }
+            finishOperation(id, { status: 'success' });
+            return reply(result);
           } finally { busyRepositories.delete(key); }
         }
         if (route === 'details') return reply(await new GitActions(repository.path).details());

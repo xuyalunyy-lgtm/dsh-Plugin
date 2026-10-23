@@ -5,7 +5,7 @@
   "type": "module",
   "main": "index.js",
   "exports": {".": "./index.js", "./client": "./client.js", "./package.json": "./package.json", "./cordis.patch.yml": "./cordis.patch.yml"},
-  "files": ["index.js", "client.js", "git-core.mjs", "git-actions.mjs", "git-preview.mjs", "repository-discovery.mjs", "cordis.patch.yml", "README.md"],
+  "files": ["index.js", "client.js", "git-core.mjs", "git-actions.mjs", "git-preview.mjs", "operation-journal.mjs", "repository-discovery.mjs", "cordis.patch.yml", "README.md"],
   "scripts": {"test": "node --test test/*.test.mjs"},
   "dsh": {
     "bundle": {"patch": "./cordis.patch.yml"},

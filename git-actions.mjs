@@ -143,10 +143,10 @@ export class GitActions extends GitReader {
       return { message: `${operation} completed`, output: redact([result.stdout, result.stderr].filter(Boolean).join('\n').trim()) };
     } catch (error) {
       if (operation === 'deleteBranch' && /checked out|used by worktree/i.test(error.message)) {
-        throw new Error(`Cannot delete a branch checked out in another worktree: ${error.message}`);
+        throw Object.assign(new Error(`Cannot delete a branch checked out in another worktree: ${error.message}`), { code: error.code, uncertain: error.uncertain });
       }
       if (!network) throw error;
-      throw Object.assign(new Error(redact(error.message)), { code: error.code });
+      throw Object.assign(new Error(redact(error.message)), { code: error.code, uncertain: error.uncertain });
     }
   }
 }

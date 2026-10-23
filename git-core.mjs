@@ -44,9 +44,14 @@ export class GitReader {
         cwd: this.root, env, encoding: 'utf8', shell: false,
         windowsHide: true, timeout, maxBuffer: MAX_BUFFER,
       }, (error, stdout, stderr) => {
-        if (error && (!acceptedCodes.includes(error.code) || error.killed)) {
+        const uncertain = Boolean(error && (error.killed || error.signal
+          || ['ETIMEDOUT', 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER', 'ABORT_ERR'].includes(error.code)));
+        if (error && (!acceptedCodes.includes(error.code) || uncertain)) {
           const failure = new Error(`Git read failed: ${String(stderr || error.message).trim()}`);
           failure.code = error.code;
+          // Killing/losing a child does not prove a mutation was rolled back.
+          // Preserve native code for existing callers; journal uses only this flag.
+          failure.uncertain = uncertain;
           failure.cause = error;
           reject(failure);
         } else resolve({ stdout, stderr, code: error?.code ?? 0 });
