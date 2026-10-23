@@ -62,7 +62,7 @@ test('defaults and exported predicates are strict and frozen', () => {
 test('restart preserves document and separate image; snapshots contain no bytes', async () => {
   const store = backing();
   let repo = new ThemeRepository(domain(store));
-  assert.deepEqual(await read(repo), { revision: 0, initialized: false, state: DEFAULT_STATE });
+  assert.deepEqual(await read(repo), { revision: 0, initialized: false, state: DEFAULT_STATE, presets: [] });
   const saved = await update(repo, { palette: 'forest', image: dataURL(), name: 'forest.png' });
   assert.equal(saved.revision, 1);
   assert.equal(saved.initialized, true);
@@ -117,7 +117,7 @@ test('image omission retains, empty removes, reset restores defaults', async () 
   assert.equal(await repo.readImage(first.state.imageId), undefined);
   assert.equal(d.store.images.size, 0);
   const reset = await repo.execute({ action: 'reset', expectedRevision: 3 });
-  assert.deepEqual(reset, { revision: 4, initialized: true, state: DEFAULT_STATE });
+  assert.deepEqual(reset, { revision: 4, initialized: true, state: DEFAULT_STATE, presets: [] });
 });
 
 test('content-addressed rows are reused, not rewritten, and only current image is accessible', async () => {

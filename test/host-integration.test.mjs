@@ -63,6 +63,18 @@ test('stopping rejects retained route and tool closures before closing domain',a
   await assert.rejects(x.tools.get('qinglan_theme').execute({action:'read'}),{code:'UNAVAILABLE'});
   assert.equal((await x.post({action:'read'})).body.code,'UNAVAILABLE');
 });
+test('saved look actions are shared between UI and tool',async()=>{
+  const x=await harness(), tool=x.tools.get('qinglan_theme');
+  await x.post({action:'update',expectedRevision:0,patch:{palette:'sky',opacity:9}});
+  const saved=await tool.execute({action:'savePreset',expectedRevision:1,name:'Work'});
+  const id=saved.presets[0].id;
+  await x.post({action:'reset',expectedRevision:2});
+  const applied=await tool.execute({action:'applyPreset',expectedRevision:3,id});
+  assert.equal(applied.state.palette,'sky'); assert.equal(applied.state.opacity,9);
+  await x.post({action:'renamePreset',expectedRevision:4,id,name:'Day'});
+  const deleted=await tool.execute({action:'deletePreset',expectedRevision:5,id});
+  assert.equal(deleted.presets.length,0); assert.equal(deleted.state.palette,'sky');
+});
 test('migration preserves original Host preferences',async()=>{
   const x=await harness();
   const migrated=await x.post({action:'importLegacy',expectedRevision:0,patch:{palette:'sky',image:''}});

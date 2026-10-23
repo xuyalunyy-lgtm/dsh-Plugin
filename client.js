@@ -35,9 +35,14 @@ window.__ModuleLoader__.load({
       previewHint: '缩略示意：同步显现度、模糊、铺放和纹理；裁切范围随窗口尺寸变化。',
       inactive: '自定义外观已关闭，当前不会应用背景。', pending: '预览中，停止调整后自动保存…',
       resetParameters: '重置背景参数（保留图片）', resetAll: '恢复全部默认设置',
-      resetWarning: '将恢复青岚配色，并移除已保存的背景图。此操作不可撤销。',
+      resetWarning: '将恢复青岚配色并清除当前背景。若要保留当前外观，请先保存为方案。',
       confirmReset: '确认恢复并移除图片', cancel: '取消', resetHelp: '仅重置显现度、模糊、铺放和纹理，不改变配色或图片。',
-      rawEmpty: '尚未选择背景图片', version: '版本 1.3.0',
+      rawEmpty: '尚未选择背景图片', version: '版本 1.4.0',
+      presets: '外观方案', presetName: '方案名称', savePreset: '保存当前外观', applyPreset: '应用', renamePreset: '重命名', deletePreset: '删除方案',
+      presetHint: '将当前配色、图片与背景参数保存为一套方案，最多 20 套。', noPresets: '还没有保存的方案。',
+      presetNameInvalid: '名称需为 1–40 字符，且不能与已有方案重名。',
+      deletePresetWarning: '确认删除此方案？不会改变当前外观。', confirmDeletePreset: '确认删除',
+      resetPreserves: '只重置当前外观，不删除已保存的方案。',
       refresh: '重新读取 Host 设置', migrate: '迁移此浏览器的旧设置',
       migrationHint: '检测到当前页面来源下的旧设置。点击迁移后存入 Host；不会删除旧副本，也不会覆盖已有 Host 设置。其他旧端口的数据需要回到对应页面迁移。',
       loading: '正在读取 Host 设置…', saving: '正在保存到 Host，请等待完成后关闭页面…', saved: '已保存到 Host',
@@ -51,9 +56,14 @@ window.__ModuleLoader__.load({
       previewHint: 'Scaled illustration using the same opacity, blur, placement and texture; cropping depends on window size.',
       inactive: 'Custom appearance is off; no background is applied.', pending: 'Previewing; saves when adjustment stops…',
       resetParameters: 'Reset background controls (keep image)', resetAll: 'Restore all defaults',
-      resetWarning: 'This restores the Sage palette and removes the saved background image. This cannot be undone.',
+      resetWarning: 'This restores the Sage palette and clears the current background. Save a look first if you want to retain this appearance.',
       confirmReset: 'Restore and remove image', cancel: 'Cancel', resetHelp: 'Resets visibility, blur, placement and texture only. Keeps your palette and image.',
-      rawEmpty: 'No background image selected', version: 'Version 1.3.0',
+      rawEmpty: 'No background image selected', version: 'Version 1.4.0',
+      presets: 'Saved looks', presetName: 'Look name', savePreset: 'Save current appearance', applyPreset: 'Apply', renamePreset: 'Rename', deletePreset: 'Delete look',
+      presetHint: 'Save the current palette, image and background controls as a look. Up to 20 looks.', noPresets: 'No saved looks yet.',
+      presetNameInvalid: 'Use a unique name of 1–40 characters.',
+      deletePresetWarning: 'Delete this look? Your current appearance will not change.', confirmDeletePreset: 'Confirm deletion',
+      resetPreserves: 'Only the current appearance is reset; saved looks are kept.',
       refresh: 'Reload Host preferences', migrate: 'Migrate this browser’s old settings',
       migrationHint: 'Old settings were found for this page origin. Migration preserves the old copy and never replaces initialized Host settings. Other ports require migration from their own pages.',
       loading: 'Loading Host preferences…', saving: 'Saving to Host; wait before closing…', saved: 'Saved to Host',
@@ -168,6 +178,8 @@ window.__ModuleLoader__.load({
     }
     const css = `.ql-panel{max-width:720px;margin:0 auto;padding:24px;color:var(--dsw-alias-label-primary);font-size:14px;line-height:1.6}.ql-panel *{box-sizing:border-box}.ql-panel h2{font-size:22px;margin:0}.ql-muted{color:var(--dsw-alias-label-secondary);font-size:13px}.ql-card{padding:18px;margin:16px 0;border:1px solid var(--dsw-alias-border-l1);border-radius:16px;background:var(--dsw-alias-bg-layer-1)}.ql-row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin:12px 0}.ql-panel button,.ql-panel select,.ql-upload{font:inherit;border:1px solid var(--dsw-alias-border-l2);border-radius:9px;padding:8px 12px;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-2);cursor:pointer}.ql-panel button[aria-pressed=true]{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}.ql-panel :focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:3px}.ql-panel input{accent-color:var(--dsw-alias-brand-primary)}.ql-panel input[type=range]{width:min(240px,100%)}.ql-swatches{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}.ql-theme-choice{min-width:0;text-align:left;display:flex;flex-direction:column;gap:8px}.ql-theme-art{display:flex;width:100%;height:28px;overflow:hidden;border-radius:6px}.ql-theme-art i{flex:1}.ql-theme-label{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px}.ql-theme-check{font-size:11px;color:var(--dsw-alias-label-secondary)}.ql-preview{height:150px;border-radius:12px;margin:12px 0;border:1px solid var(--dsw-alias-border-l1);overflow:hidden;position:relative;background:var(--dsw-alias-bg-base)}.ql-preview span{position:absolute;bottom:10px;left:12px;padding:4px 8px;border-radius:6px;background:var(--dsw-alias-bg-overlay);max-width:90%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ql-error{color:var(--dsw-alias-state-error-primary)}@media(max-width:540px){.ql-panel{padding:14px}.ql-row{align-items:flex-start}}`;
     const panelCss = `
+      .ql-preset-row{padding:14px 0;border-bottom:1px solid var(--dsw-alias-border-l1);overflow-wrap:anywhere}
+      .ql-panel input[type=text]{max-width:100%;min-width:0;padding:8px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-base);font:inherit}
       .ql-fields{border:0;margin:0;padding:0;min-width:0}.ql-fields:disabled{opacity:.75}
       .ql-header{padding-bottom:12px;border-bottom:1px solid var(--dsw-alias-border-l1)}
       .ql-header h2{margin-bottom:10px}.ql-enable{display:flex;align-items:center;gap:8px}
@@ -318,6 +330,12 @@ window.__ModuleLoader__.load({
           const [section, setSection] = React.useState('palette');
           const [preview, setPreview] = React.useState('effect');
           const [confirming, setConfirming] = React.useState(false);
+          const [presetName, setPresetName] = React.useState('');
+          const [renaming, setRenaming] = React.useState(null);
+          const [renameName, setRenameName] = React.useState('');
+          const [deleteId, setDeleteId] = React.useState(null);
+          const presetHeading = React.useRef(null);
+          const presets = view.remote?.presets || [];
           const fileRef = React.useRef(null);
           const cancelRef = React.useRef(null);
           const resetRef = React.useRef(null);
@@ -325,11 +343,24 @@ window.__ModuleLoader__.load({
           const instanceId = React.useId();
           React.useEffect(() => () => { generation.current++; saves.flush(); }, []);
           React.useEffect(() => { if (confirming) cancelRef.current?.focus(); }, [confirming]);
+          React.useEffect(() => { setConfirming(false); setDeleteId(null); setRenaming(null); }, [view.epoch]);
           function change(patch, deferred = false) {
             setMessage(''); setConfirming(false);
             return update(patch, deferred);
           }
-          function selectSection(next) { saves.flush(); setConfirming(false); setSection(next); }
+          function selectSection(next) { saves.flush(); setConfirming(false); setDeleteId(null); setRenaming(null); setSection(next); }
+          async function presetAction(action, extra = {}) {
+            if (extra.name !== undefined) {
+              extra = { ...extra, name: extra.name.trim() };
+              if (!extra.name || extra.name.length > 40 || presets.some(p => p.id !== extra.id && p.name.toLowerCase() === extra.name.toLowerCase())) {
+                setMessage('presetNameInvalid'); return;
+              }
+            }
+            if (action === 'applyPreset') generation.current++;
+            setMessage(''); setConfirming(false);
+            const ok = await model.action(action, extra);
+            if (ok) { setPresetName(''); setRenaming(null); setDeleteId(null); presetHeading.current?.focus(); }
+          }
           function closeConfirmation() { setConfirming(false); resetRef.current?.focus(); }
           async function upload(event) {
             const file = event.target.files?.[0]; event.target.value = '';
@@ -361,11 +392,29 @@ window.__ModuleLoader__.load({
               h('p', { className: 'ql-muted' }, t('current'), '：', t(s.palette), ' · ', t('version')),
               !s.enabled && h('p', { className: 'ql-muted' }, t('inactive')),
               h('div', { className: 'ql-segments', role: 'group', 'aria-label': t('title') },
-                ['palette', 'background'].map(key => button(key, () => selectSection(key), { key, 'aria-pressed': section === key, 'aria-controls': `${instanceId}-content` })))),
+                ['palette', 'background', 'presets'].map(key => button(key, () => selectSection(key), { key, 'aria-pressed': section === key, 'aria-controls': `${instanceId}-content` })))),
             h('div', { className: 'ql-row' }, button('refresh', () => model.load(), { disabled: view.status === 'pending' || view.status === 'saving' }),
               legacy && view.ready && !view.remote?.initialized && button('migrate', () => model.action('importLegacy', { patch: legacy }), { disabled: locked })),
             legacy && view.ready && !view.remote?.initialized && h('p', { className: 'ql-muted' }, t('migrationHint')),
             h('fieldset', { id: `${instanceId}-content`, className: 'ql-fields', disabled: locked },
+            section === 'presets' && h('div', { className: 'ql-card' },
+              h('h3', { ref: presetHeading, tabIndex: -1 }, t('presets'), ` (${presets.length}/20)`),
+              h('p', { className: 'ql-muted' }, t('presetHint')),
+              h('label', { className: 'ql-row' }, t('presetName'), h('input', { type: 'text', maxLength: 40, value: presetName, onChange: e => setPresetName(e.target.value) })),
+              button('savePreset', () => presetAction('savePreset', { name: presetName }), { disabled: !presetName.trim() || presets.length >= 20 }),
+              !presets.length && h('p', { className: 'ql-muted' }, t('noPresets')),
+              presets.map(p => h('div', { key: p.id, className: 'ql-preset-row' },
+                h('strong', null, p.name), h('div', { className: 'ql-muted' }, t(p.state.palette), ' · ', p.state.name || t('empty')),
+                h('div', { className: 'ql-segments' },
+                  button('applyPreset', () => presetAction('applyPreset', { id: p.id })),
+                  button('renamePreset', () => { setRenaming(p.id); setRenameName(p.name); setDeleteId(null); }),
+                  button('deletePreset', () => { setDeleteId(p.id); setRenaming(null); })),
+                renaming === p.id && h('div', { className: 'ql-confirm' },
+                  h('label', { className: 'ql-row' }, t('presetName'), h('input', { type: 'text', maxLength: 40, value: renameName, onChange: e => setRenameName(e.target.value) })),
+                  h('div', { className: 'ql-segments' }, button('renamePreset', () => presetAction('renamePreset', { id: p.id, name: renameName }), { disabled: !renameName.trim() }), button('cancel', () => setRenaming(null)))),
+                deleteId === p.id && h('div', { className: 'ql-confirm' }, h('p', null, t('deletePresetWarning')),
+                  h('div', { className: 'ql-segments' }, button('cancel', () => setDeleteId(null)), button('confirmDeletePreset', () => presetAction('deletePreset', { id: p.id }))))
+              ))),
             section === 'palette' && h('div', { className: 'ql-card' }, h('h3', null, t('palette')),
               Object.entries(paletteGroups).map(([group, keys]) => h('div', { key: group, role: 'group', 'aria-label': t(group) },
                 h('h4', { className: 'ql-muted' }, t(group)),
@@ -400,7 +449,7 @@ window.__ModuleLoader__.load({
               button('resetAll', () => { saves.flush(); setConfirming(true); }, { ref: resetRef, disabled: locked, 'aria-expanded': confirming, 'aria-controls': `${instanceId}-reset` }),
               confirming && h('div', { id: `${instanceId}-reset`, className: 'ql-confirm', role: 'group', 'aria-label': t('resetAll'),
                 onKeyDown: e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeConfirmation(); } },
-              }, h('p', null, t('resetWarning')),
+              }, h('p', null, t('resetWarning')), h('p', { className: 'ql-muted' }, t('resetPreserves')),
                 h('div', { className: 'ql-segments' },
                   button('cancel', closeConfirmation, { ref: cancelRef }),
                   button('confirmReset', () => { generation.current++; setConfirming(false); setMessage(''); model.action('reset'); resetRef.current?.focus(); }, { disabled: locked }))),

@@ -1,12 +1,14 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 const MAX_BYTES = 3 * 1024 * 1024;
 const MAX_BASE64 = 4 * Math.ceil(MAX_BYTES / 3);
 const PALETTES = new Set(['green', 'apricot', 'forest', 'sky', 'lavender', 'rose', 'mint', 'silver', 'midnight', 'plum', 'coffee', 'graphite']);
 const FIELDS = ['enabled', 'palette', 'opacity', 'blur', 'fit', 'name', 'pattern'];
 const ID = /^[a-f0-9]{64}$/;
+const PRESET_ID = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
+const MAX_PRESETS = 20;
 export const DEFAULT_STATE = Object.freeze({ enabled: true, palette: 'green', opacity: 12, blur: 0, fit: 'cover', name: '', pattern: true, imageId: null });
-export const INITIAL_DOCUMENT = Object.freeze({ revision: 0, initialized: false, current: DEFAULT_STATE });
+export const INITIAL_DOCUMENT = Object.freeze({ revision: 0, initialized: false, current: DEFAULT_STATE, presets: Object.freeze([]) });
 
 function invalid(message = 'Invalid theme input') {
   return Object.assign(new Error(message), { code: 'INVALID_INPUT' });
@@ -35,13 +37,41 @@ function validField(key, value) {
 }
 function revision(value) { return Number.isSafeInteger(value) && value >= 0; }
 
-/** Boolean predicates for z.custom; no zod dependency in the repository. */
+function validState(value) {
+  return plain(value, [...FIELDS, 'imageId'], [...FIELDS, 'imageId']) &&
+    Object.entries(value).every(([k, v]) => validField(k, v));
+}
+function validPresetName(value) {
+  return typeof value === 'string' && value.length >= 1 && value.length <= 40 && value === value.trim();
+}
+function validPresetId(value) { return typeof value === 'string' && PRESET_ID.test(value); }
+function validPresets(value) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length > MAX_PRESETS) return false;
+  // Reject sparse arrays, extra/symbol keys, and getters before inspecting elements.
+  if (Reflect.ownKeys(value).length !== value.length + 1) return false;
+  const ids = new Set(), names = new Set();
+  for (let i = 0; i < value.length; i++) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(i));
+    if (!descriptor || !Object.hasOwn(descriptor, 'value') || !descriptor.enumerable) return false;
+    const preset = descriptor.value;
+    if (!plain(preset, ['id', 'name', 'state'], ['id', 'name', 'state']) ||
+        !validPresetId(preset.id) || !validPresetName(preset.name) || !validState(preset.state) ||
+        ids.has(preset.id) || names.has(preset.name.toLowerCase())) return false;
+    ids.add(preset.id); names.add(preset.name.toLowerCase());
+  }
+  return true;
+}
+function clonePresets(presets) { return presets.map(preset => ({ ...preset, state: { ...preset.state } })); }
+function imageReferences(document) {
+  return new Set([document.current.imageId, ...document.presets.map(preset => preset.state.imageId)]);
+}
+
+/** Boolean predicates for z.custom; old version-1 documents may omit presets. */
 export function validDocument(value) {
   try {
-    return plain(value, ['revision', 'initialized', 'current'], ['revision', 'initialized', 'current']) &&
-      revision(value.revision) && typeof value.initialized === 'boolean' &&
-      plain(value.current, [...FIELDS, 'imageId'], [...FIELDS, 'imageId']) &&
-      Object.entries(value.current).every(([k, v]) => validField(k, v));
+    return plain(value, ['revision', 'initialized', 'current', 'presets'], ['revision', 'initialized', 'current']) &&
+      revision(value.revision) && typeof value.initialized === 'boolean' && validState(value.current) &&
+      (!Object.hasOwn(value, 'presets') || validPresets(value.presets));
   } catch { return false; }
 }
 function imageBytes(record) {
@@ -71,16 +101,30 @@ function parseImage(value) {
 }
 function parseRequest(request) {
   try {
-    if (!plain(request, ['action', 'expectedRevision', 'patch'], ['action'])) throw invalid();
+    if (!plain(request, ['action', 'expectedRevision', 'patch', 'id', 'name'], ['action'])) throw invalid();
     const { action } = request;
-    if (action === 'read') {
-      if (Reflect.ownKeys(request).length !== 1) throw invalid('Read accepts only action');
-      return { action };
-    }
-    if (!['update', 'importLegacy', 'reset'].includes(action) || !Object.hasOwn(request, 'expectedRevision') || !revision(request.expectedRevision)) throw invalid('Mutation requires expectedRevision');
-    if (action === 'reset') {
-      if (Object.hasOwn(request, 'patch')) throw invalid('Reset does not accept patch');
-      return { action, expectedRevision: request.expectedRevision };
+    const fields = {
+      read: ['action'], update: ['action', 'expectedRevision', 'patch'],
+      importLegacy: ['action', 'expectedRevision', 'patch'], reset: ['action', 'expectedRevision'],
+      savePreset: ['action', 'expectedRevision', 'name'], applyPreset: ['action', 'expectedRevision', 'id'],
+      renamePreset: ['action', 'expectedRevision', 'id', 'name'], deletePreset: ['action', 'expectedRevision', 'id'],
+    };
+    if (typeof action !== 'string' || !Object.hasOwn(fields, action) || !plain(request, fields[action], fields[action])) throw invalid('Invalid action fields');
+    if (action === 'read') return { action };
+    if (!revision(request.expectedRevision)) throw invalid('Mutation requires expectedRevision');
+    if (action === 'reset') return { action, expectedRevision: request.expectedRevision };
+    if (action.endsWith('Preset')) {
+      const result = { action, expectedRevision: request.expectedRevision };
+      if (Object.hasOwn(request, 'id')) {
+        if (!validPresetId(request.id)) throw invalid('Invalid preset ID');
+        result.id = request.id;
+      }
+      if (Object.hasOwn(request, 'name')) {
+        // Bound raw input as well as the trimmed display name.
+        if (typeof request.name !== 'string' || request.name.length > 200 || !validPresetName(request.name.trim())) throw invalid('Preset name must contain 1 to 40 characters');
+        result.name = request.name.trim();
+      }
+      return result;
     }
     if (!Object.hasOwn(request, 'patch') || !plain(request.patch, [...FIELDS, 'image'])) throw invalid('Invalid patch fields');
     const patch = {};
@@ -116,10 +160,10 @@ export class ThemeRepository {
   #document() {
     const document = this.#domain.global.get();
     if (!validDocument(document)) throw invalid('Invalid persisted theme document');
-    return { ...document, current: { ...document.current } };
+    return { ...document, current: { ...document.current }, presets: clonePresets(Object.hasOwn(document, 'presets') ? document.presets : []) };
   }
   #snapshot(document) {
-    return { revision: document.revision, initialized: document.initialized, state: { ...document.current } };
+    return { revision: document.revision, initialized: document.initialized, state: { ...document.current }, presets: clonePresets(document.presets) };
   }
   async execute(request) {
     // Capture caller-owned inputs before queueing; later caller mutation cannot change a write.
@@ -130,35 +174,49 @@ export class ThemeRepository {
       if (input.expectedRevision !== previous.revision) throw Object.assign(new Error('Theme revision conflict'), { code: 'CONFLICT' });
       if (input.action === 'importLegacy' && previous.initialized) return this.#snapshot(previous);
       if (previous.revision === Number.MAX_SAFE_INTEGER) throw invalid('Theme revision exhausted');
-      const current = input.action === 'reset' ? { ...DEFAULT_STATE } : { ...previous.current, ...input.patch };
+      let current = input.action === 'reset' ? { ...DEFAULT_STATE } : { ...previous.current, ...input.patch };
+      let presets = previous.presets;
+      if (input.action === 'savePreset' || input.action === 'renamePreset') {
+        if (presets.some(preset => preset.id !== input.id && preset.name.toLowerCase() === input.name.toLowerCase())) throw invalid('Preset name already exists');
+      }
+      if (input.action === 'savePreset') {
+        if (presets.length >= MAX_PRESETS) throw invalid('At most 20 presets may be saved');
+        presets.push({ id: randomUUID(), name: input.name, state: { ...current } });
+      } else if (['applyPreset', 'renamePreset', 'deletePreset'].includes(input.action)) {
+        const preset = presets.find(item => item.id === input.id);
+        if (!preset) throw invalid('Preset not found');
+        if (input.action === 'applyPreset') current = { ...preset.state };
+        else if (input.action === 'renamePreset') preset.name = input.name;
+        else presets = presets.filter(item => item.id !== input.id);
+      }
       if (input.image !== undefined) current.imageId = input.image?.id ?? null;
       if (input.image) {
         const existing = this.#images.get(input.image.id);
         if (existing === undefined) await this.#images.put(input.image.id, { ...input.image.record });
         else if (!validImageRecord(existing) || existing.mime !== input.image.record.mime || existing.data !== input.image.record.data) throw invalid('Stored image does not match its content address');
       }
-      const next = { revision: previous.revision + 1, initialized: true, current };
+      const next = { revision: previous.revision + 1, initialized: true, current, presets };
       // Domain promises durable-before-memory: failure here leaves previous preferences intact.
       // A newly inserted orphan is harmless and collected after a later successful commit.
       await this.#domain.global.set(next);
-      await this.#cleanup(next.current.imageId);
+      await this.#cleanup(imageReferences(next));
       return this.#snapshot(next);
     });
   }
   async readImage(id) {
     if (typeof id !== 'string' || !ID.test(id)) throw invalid('Invalid image ID');
     return this.#enqueue(() => {
-      if (this.#document().current.imageId !== id) return undefined;
+      if (!imageReferences(this.#document()).has(id)) return undefined;
       const record = this.#images.get(id);
       if (record === undefined) return undefined;
       if (!validImageRecord(record) || createHash('sha256').update(Buffer.from(record.data, 'base64')).digest('hex') !== id) throw invalid('Invalid persisted image');
       return { mime: record.mime, data: record.data };
     });
   }
-  async #cleanup(referencedId) {
+  async #cleanup(referencedIds) {
     try {
       for (const [id] of this.#images.entries()) {
-        if (id !== referencedId) {
+        if (!referencedIds.has(id)) {
           try { await this.#images.delete(id); } catch { /* Committed preferences must still succeed. */ }
         }
       }
