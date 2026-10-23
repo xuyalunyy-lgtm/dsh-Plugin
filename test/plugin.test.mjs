@@ -7,8 +7,8 @@ import {apply} from '../index.js';
 test('host registers only authenticated connection routes and rejects invalid input',async()=>{
  const routes=[];
  apply({connection:{fetch:{register:r=>routes.push(r)}},sessions:{get:()=>undefined},get:()=>undefined,sandboxPolicy:{workspaceRoot:process.cwd()}});
- assert.deepEqual(routes.map(route=>route.path),['repositories','snapshot','diff','details','action','overview','preview'].map(name=>'/api/git-visualizer/'+name));
- assert.equal(routes.length,7);
+ assert.deepEqual(routes.map(route=>route.path),['repositories','snapshot','diff','details','action','overview','preview','summary'].map(name=>'/api/git-visualizer/'+name));
+ assert.equal(routes.length,8);
  for(const r of routes){
   assert.deepEqual(r.methods,['POST']);
   assert.ok(r.path.startsWith('/api/git-visualizer/'));

@@ -68,6 +68,52 @@ export class GitReader {
     throw error;
   }
 
+  /** Lightweight local-only summary from a single porcelain-v2 status read.
+   * changes counts paths (including untracked/unmerged); staged counts resolved
+   * index changes only. Missing branch.ab means unknown, not zero divergence.
+   */
+  async summary() {
+    if (!await this._isRepository()) throw Object.assign(new Error('Not a Git repository'), { code: 'NOT_GIT_REPOSITORY' });
+    const { stdout } = await this._git(['status', '--porcelain=v2', '--branch', '-z', '--untracked-files=all']);
+    const result = {
+      branch: null, head: null, upstream: null, ahead: null, behind: null,
+      changes: 0, staged: 0, untracked: 0, conflicts: 0,
+      checkedAt: new Date().toISOString(),
+    };
+    const records = stdout.split('\0');
+    for (let i = 0; i < records.length; i++) {
+      const record = records[i];
+      if (record.startsWith('# branch.oid ')) {
+        const oid = record.slice(13);
+        result.head = oid === '(initial)' ? null : oid;
+      } else if (record.startsWith('# branch.head ')) {
+        const branch = record.slice(14);
+        result.branch = branch === '(detached)' ? null : branch;
+      } else if (record.startsWith('# branch.upstream ')) {
+        result.upstream = record.slice(18);
+      } else if (record.startsWith('# branch.ab ')) {
+        const counts = /^# branch\.ab \+(\d+) -(\d+)$/.exec(record);
+        if (counts) {
+          result.ahead = Number(counts[1]);
+          result.behind = Number(counts[2]);
+        }
+      } else if (record.startsWith('1 ') || record.startsWith('2 ')) {
+        result.changes++;
+        if (record[2] !== '.') result.staged++;
+        // In -z mode type 2 has a second NUL-delimited original pathname.
+        // It is opaque: even a name resembling a header is never metadata.
+        if (record[0] === '2') i++;
+      } else if (record.startsWith('u ')) {
+        result.changes++;
+        result.conflicts++;
+      } else if (record.startsWith('? ')) {
+        result.changes++;
+        result.untracked++;
+      }
+    }
+    return result;
+  }
+
   /** { isRepository, branch: string|null, status, branches: string[], commits } */
   async snapshot() {
     return (await this._snapshot()).snapshot;
