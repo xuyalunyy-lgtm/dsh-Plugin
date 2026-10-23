@@ -4,7 +4,7 @@ const pdfjs = require('pdfjs-dist/build/pdf.mjs');
 const workerSource = require('pdfjs-dist/build/pdf.worker.mjs').default;
 const assets = require('./pdf-assets.json');
 const {findMatches, pdfPageText, intersections, decodeMarkdown} = require('./search.mjs');
-const {matchPosition, nextMatchIndex} = require('./match-navigation.mjs');
+const {matchPosition, nextMatchIndex, matchJumpTarget, isComposingKey} = require('./match-navigation.mjs');
 const css = require('./style.css');
 const zh = require('../locale/zh.json');
 const en = require('../locale/en.json');
@@ -27,7 +27,7 @@ function marks(text, matches, active, prefix='') {
   });
   out.push(text.slice(offset)); return out;
 }
-function PdfPage({doc, pageNumber, record, matches, active, t}) {
+function PdfPage({doc, pageNumber, record, matches, active, reveal, t}) {
   const canvas=useRef(null), layer=useRef(null), shell=useRef(null);
   const [width,setWidth]=useState(600), [error,setError]=useState(''), [ready,setReady]=useState(0);
   const textLayer=useRef(null);
@@ -65,13 +65,15 @@ function PdfPage({doc, pageNumber, record, matches, active, t}) {
       nodes.push(document.createTextNode(text.slice(offset))); div.replaceChildren(...nodes);
     });
     layer.current.querySelector('[data-active="true"]')?.scrollIntoView({block:'nearest',inline:'nearest'});
-  },[record,matches,active,ready]);
+  },[record,matches,active,ready,reveal]);
   return h('div',{ref:shell,className:'dbs-pdf-shell'},error&&h('p',{role:'alert'},t('renderError')+' '+error),h('div',{className:'dbs-pdf-page'},h('canvas',{ref:canvas,'aria-label':t('page')+' '+pageNumber}),h('div',{ref:layer,className:'dbs-textLayer'})));
 }
 function Reader({content,resourceAddress,scrollportRef,isPdf,t}) {
   const [query,setQuery]=useState(''),[sensitive,setSensitive]=useState(false),[current,setCurrent]=useState(0),[page,setPage]=useState(1);
   const [state,setState]=useState({loading:true,pages:[],doc:null,error:''});
-  const scroll=useRef(null), input=useRef(null);
+  const [jumpValue,setJumpValue]=useState(''),[jumpError,setJumpError]=useState(''),[reveal,setReveal]=useState(0);
+  const scroll=useRef(null), input=useRef(null), jumpComposing=useRef(false);
+  const jumpErrorId=React.useId();
   const data=content.kind==='bytes'?content.data:null;
   useEffect(()=>{
     let disposed=false,task;
@@ -98,10 +100,19 @@ function Reader({content,resourceAddress,scrollportRef,isPdf,t}) {
   const active=position.status==='matched'?results[position.current-1]:undefined;
   const pageActive=active?.page===page?pageMatches.indexOf(active):-1;
   const changeQuery=value=>{setQuery(value);setCurrent(0);};
-  useEffect(()=>{if(results[0])setPage(results[0].page);setCurrent(0);},[results]);
-  useEffect(()=>{if(!isPdf)scroll.current?.querySelector('[data-active="true"]')?.scrollIntoView({block:'nearest',inline:'nearest'});},[current,results,isPdf]);
+  useEffect(()=>{if(results[0])setPage(results[0].page);setCurrent(0);setJumpValue('');setJumpError('');jumpComposing.current=false;},[results]);
+  useEffect(()=>{if(!isPdf)scroll.current?.querySelector('[data-active="true"]')?.scrollIntoView({block:'nearest',inline:'nearest'});},[current,results,isPdf,reveal]);
   const counterText=position.status==='matched'?t('matchCount',{current:position.current,total:position.total}):t({idle:'idle',empty:'noMatches',loading:'indexing',error:'searchUnavailable'}[position.status]);
-  const move=delta=>{if(!results.length)return;const next=nextMatchIndex(current,delta,results.length);setCurrent(next);setPage(results[next].page);};
+  // All match navigation shares the same current-item and PDF-page update.
+  // A reveal revision also repositions an already-selected match after manual scrolling.
+  const selectMatch=index=>{const target=results[index];if(!target)return;setCurrent(index);setPage(target.page);setReveal(value=>value+1);};
+  const move=delta=>{if(!results.length)return;setJumpError('');selectMatch(nextMatchIndex(current,delta,results.length));};
+  const jump=()=>{
+    if(jumpComposing.current||position.status!=='matched')return;
+    const target=matchJumpTarget(jumpValue,results);
+    if(!target.ok){setJumpError(target.error);return;}
+    setJumpError('');setJumpValue(String(target.ordinal));selectMatch(target.index);
+  };
   const ref=node=>{scroll.current=node;scrollportRef?.(node);};
   const button=(label,click,disabled)=>h('button',{type:'button',onClick:click,disabled,'aria-label':label,title:label},label);
   return h('section',{className:'dbs-root',onKeyDown:e=>{
@@ -113,12 +124,21 @@ function Reader({content,resourceAddress,scrollportRef,isPdf,t}) {
     h('div',{className:'dbs-toolbar dbs-results'},
       h('output',{className:'dbs-match-counter','data-status':position.status,'aria-live':'polite','aria-atomic':'true'},counterText),
       button(t('previous'),()=>move(-1),position.status!=='matched'),button(t('next'),()=>move(1),position.status!=='matched'),
-      isPdf&&position.status==='matched'&&active&&h('span',{className:'dbs-match-page'},t('matchPage',{page:active.page}))),
+      h('label',{className:'dbs-jump-label'},t('jumpLabel'),h('input',{
+        className:'dbs-jump-input',type:'text',inputMode:'numeric',autoComplete:'off',spellCheck:false,
+        value:jumpValue,placeholder:t('jumpPlaceholder',{total:position.total}),disabled:position.status!=='matched',
+        'aria-invalid':Boolean(jumpError),'aria-describedby':jumpError?jumpErrorId:undefined,
+        onChange:e=>{setJumpValue(e.target.value);setJumpError('');},
+        onCompositionStart:()=>{jumpComposing.current=true;},onCompositionEnd:()=>{jumpComposing.current=false;},
+        onKeyDown:e=>{if(e.key==='Enter'&&!isComposingKey(e,jumpComposing.current)){e.preventDefault();e.stopPropagation();jump();}}
+      })),button(t('jumpButton'),jump,position.status!=='matched'),
+      isPdf&&position.status==='matched'&&active&&h('span',{className:'dbs-match-page'},t('matchPage',{page:active.page})),
+      jumpError&&h('span',{id:jumpErrorId,className:'dbs-jump-error',role:'alert'},t(jumpError,{total:position.total}))),
     isPdf&&state.pages.length>0&&h('div',{className:'dbs-toolbar'},button('‹',()=>setPage(p=>Math.max(1,p-1)),page<=1),h('label',null,t('page'),h('input',{type:'number',min:1,max:state.pages.length,value:page,onChange:e=>{const n=Number(e.target.value);if(Number.isInteger(n)&&n>=1&&n<=state.pages.length)setPage(n);}})),h('span',null,' / '+state.pages.length),button('›',()=>setPage(p=>Math.min(state.pages.length,p+1)),page>=state.pages.length)),
     h('p',{className:'dbs-note'},t(isPdf?'pdfNote':'mdNote')),
     h('div',{className:'dbs-scroll',ref},
       state.loading?h('p',{role:'status'},t('loading')):state.error?h('p',{role:'alert'},t('error')+' '+state.error):isPdf?
-        h(React.Fragment,null,!state.pages.some(p=>p.text.trim())&&h('p',{role:'status'},t('scanned')),h(PdfPage,{doc:state.doc,pageNumber:page,record:state.pages[page-1],matches:pageMatches,active:pageActive,t})):
+        h(React.Fragment,null,!state.pages.some(p=>p.text.trim())&&h('p',{role:'status'},t('scanned')),h(PdfPage,{doc:state.doc,pageNumber:page,record:state.pages[page-1],matches:pageMatches,active:pageActive,reveal,t})):
         h('pre',{className:'dbs-markdown'},marks(state.pages[0]?.text||'',results,position.current-1))));
 }
 module.exports={inject:['slots','documentPreviews','locale'],apply(ctx){
