@@ -1,6 +1,6 @@
 {
   "name": "dsh-git-visualizer",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "DSH Git 工作台：多仓库检索、差异、暂存提交、分支与安全远程同步",
   "type": "module",
   "main": "index.js",

@@ -12,7 +12,7 @@ let activeRequests = 0;
 const MAX_REQUESTS = 4;
 const ACTION_PARAMETERS = Object.freeze({
   stage: ['paths'], unstage: ['paths'], commit: ['message'],
-  createBranch: ['branch'], switchBranch: ['branch'],
+  createBranch: ['branch'], deleteBranch: ['branch'], switchBranch: ['branch'],
   fetch: [], pull: [], push: [],
 });
 const ACTION_COMMON = ['sessionId', 'repository', 'operation', 'confirm', 'expectedHead', 'expectedBranch'];
@@ -31,7 +31,7 @@ function validateAction(body) {
     if (!Array.isArray(body.paths) || body.paths.length === 0 || body.paths.length > 200 || body.paths.some(file => typeof file !== 'string' || !file || file.length > 4096 || file.includes('\0'))) throw new TypeError('请选择有效的仓库内文件');
   }
   if (body.operation === 'commit' && (typeof body.message !== 'string' || !body.message.trim() || body.message.length > 8000 || body.message.includes('\0'))) throw new TypeError('请输入有效的提交说明');
-  if ((body.operation === 'createBranch' || body.operation === 'switchBranch') && (typeof body.branch !== 'string' || !body.branch || body.branch.length > 1024 || body.branch.includes('\0'))) throw new TypeError('请输入有效的分支名称');
+  if ((body.operation === 'createBranch' || body.operation === 'deleteBranch' || body.operation === 'switchBranch') && (typeof body.branch !== 'string' || !body.branch || body.branch.length > 1024 || body.branch.includes('\0'))) throw new TypeError('请输入有效的分支名称');
 }
 
 function errorStatus(error) {

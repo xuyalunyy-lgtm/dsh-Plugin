@@ -2,7 +2,7 @@ import path from 'node:path';
 import { lstat, realpath } from 'node:fs/promises';
 import { GitReader } from './git-core.mjs';
 
-const OPERATIONS = new Set(['stage', 'unstage', 'commit', 'createBranch', 'switchBranch', 'fetch', 'pull', 'push']);
+const OPERATIONS = new Set(['stage', 'unstage', 'commit', 'createBranch', 'deleteBranch', 'switchBranch', 'fetch', 'pull', 'push']);
 const KEYS = new Set(['operation', 'paths', 'message', 'branch', 'expectedHead', 'expectedBranch']);
 const NO_HOOKS = ['-c', 'core.hooksPath=/dev/null'];
 const NETWORK = [...NO_HOOKS, '-c', 'credential.interactive=false', '-c', 'core.askPass=', '-c', 'protocol.ext.allow=never'];
@@ -50,6 +50,15 @@ export class GitActions extends GitReader {
     return branch;
   }
 
+  async _localBranchTip(branch) {
+    const ref = `refs/heads/${branch}`;
+    const symbolic = await this._git(['symbolic-ref', '--quiet', ref], [1]);
+    if (symbolic.code === 0) throw new Error('Only a real local branch ref can be deleted (not a symbolic ref)');
+    const target = await this._git(['show-ref', '--verify', '--hash', ref], [1, 128]);
+    if (target.code !== 0) throw new Error('Local branch does not exist');
+    return target.stdout.trim();
+  }
+
   async _upstream(state) {
     if (!state.branch || !state.head) throw new Error('Network operations require a current committed branch');
     const remote = await this._git(['config', '--get', `branch.${state.branch}.remote`], [1]);
@@ -70,7 +79,7 @@ export class GitActions extends GitReader {
     if (!OPERATIONS.has(operation)) throw new TypeError('Unsupported Git operation');
     if (paths !== undefined && operation !== 'stage' && operation !== 'unstage') throw new TypeError('paths are only allowed for stage/unstage');
     if (message !== undefined && operation !== 'commit') throw new TypeError('message is only allowed for commit');
-    if (branch !== undefined && operation !== 'createBranch' && operation !== 'switchBranch') throw new TypeError('branch is only allowed for branch operations');
+    if (branch !== undefined && operation !== 'createBranch' && operation !== 'deleteBranch' && operation !== 'switchBranch') throw new TypeError('branch is only allowed for branch operations');
     if (expectedHead !== undefined && expectedHead !== null && (typeof expectedHead !== 'string' || !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(expectedHead))) throw new TypeError('Invalid expectedHead');
     if (expectedBranch !== undefined && expectedBranch !== null && (typeof expectedBranch !== 'string' || !expectedBranch || expectedBranch.includes('\0'))) throw new TypeError('Invalid expectedBranch');
     const state = await this.details();
@@ -94,7 +103,28 @@ export class GitActions extends GitReader {
         args = [...NO_HOOKS, '-c', 'commit.gpgSign=false', 'commit', '--no-amend', '--no-gpg-sign', '-m', message, '--'];
         break;
       }
-      case 'createBranch': args = ['branch', '--', await this._branch(branch)]; break;
+      case 'createBranch':
+        if (!state.head) throw new Error('Creating a branch requires an existing HEAD commit');
+        args = ['branch', '--', await this._branch(branch), state.head];
+        break;
+      case 'deleteBranch': {
+        const name = await this._branch(branch);
+        if (!state.head) throw new Error('Deleting a branch requires an existing HEAD commit');
+        if (name === state.branch) throw new Error('Cannot delete the current branch');
+        const tip = await this._localBranchTip(name);
+        // -d alone may accept a branch merged into its upstream but not HEAD.
+        const merged = await this._git(['merge-base', '--is-ancestor', tip, state.head], [1]);
+        if (merged.code !== 0) throw new Error('Cannot delete a branch that is not fully merged into the current HEAD');
+        const current = await this.details();
+        const currentTip = await this._localBranchTip(name);
+        if (current.head !== state.head || current.branch !== state.branch || currentTip !== tip) {
+          throw Object.assign(new Error('Repository state or target branch changed; refresh before trying again'), { code: 'STALE_STATE', status: 409 });
+        }
+        // Rechecks reduce external races; they cannot make this atomic with other
+        // Git processes. Retain native -d merge and linked-worktree guards.
+        args = ['branch', '--delete', '--', name];
+        break;
+      }
       case 'switchBranch':
         if (!state.clean) throw new Error('A clean worktree (including untracked files) is required to switch branches');
         args = [...NO_HOOKS, 'switch', '--no-guess', '--', await this._branch(branch)];
@@ -112,6 +142,9 @@ export class GitActions extends GitReader {
       const result = await this._git([...NO_HOOKS, ...args], [], { timeout: network ? 60_000 : 10_000 });
       return { message: `${operation} completed`, output: redact([result.stdout, result.stderr].filter(Boolean).join('\n').trim()) };
     } catch (error) {
+      if (operation === 'deleteBranch' && /checked out|used by worktree/i.test(error.message)) {
+        throw new Error(`Cannot delete a branch checked out in another worktree: ${error.message}`);
+      }
       if (!network) throw error;
       throw Object.assign(new Error(redact(error.message)), { code: error.code });
     }
