@@ -154,7 +154,7 @@ test('routes discover and isolate independent repositories using server session 
     const response = await routes.get(action).fetch(new Request('http://localhost', { method: 'POST', body: JSON.stringify({ sessionId: 'session-test', ...body }) }));
     return { status: response.status, body: await response.json() };
   };
-  assert.equal(routes.size, 8);
+  assert.equal(routes.size, 9);
   assert.deepEqual((await request('repositories')).body.repositories.map(repo => repo.id), ['one', 'two']);
   assert.equal((await request('snapshot', { repository: 'one', cwd: two })).body.branch, 'first');
   assert.equal((await request('snapshot', { repository: 'two', root: one })).body.branch, 'second');

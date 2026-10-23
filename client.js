@@ -58,6 +58,8 @@ window.__ModuleLoader__.load({
       const [repoStats,setRepoStats]=useState({}),[statsBusy,setStatsBusy]=useState(false),[repoFilter,setRepoFilter]=useState('all');
       const statsGeneration=useRef(0),statsRunning=useRef(false);
       const [fileSelection,setFileSelection]=useState([]);
+      const [branchMeta,setBranchMeta]=useState(null),[branchMetaError,setBranchMetaError]=useState(''),[branchMetaBusy,setBranchMetaBusy]=useState(false);
+      const branchGeneration=useRef(0);
       const fileKey=(mode,path)=>JSON.stringify([mode,path]);
       function toggleFiles(mode,files,checked){const keys=files.map(f=>fileKey(mode,f.path));setFileSelection(previous=>checked?[...new Set([...previous,...keys])]:previous.filter(key=>!keys.includes(key)));}
       function changeQuery(value){setQuery(value);setFileSelection([]);}
@@ -81,11 +83,12 @@ window.__ModuleLoader__.load({
         const worker=async()=>{while(token===statsGeneration.current&&cursor<items.length){const repo=items[cursor++];try{const value=await call('summary',{repository:repo.id});if(token===statsGeneration.current)setRepoStats(previous=>({...previous,[repo.id]:{value}}));}catch(e){if(token===statsGeneration.current)setRepoStats(previous=>({...previous,[repo.id]:{error:e.message,checkedAt:new Date().toISOString()}}));}}};
         try{await Promise.all([worker(),worker()]);}finally{statsRunning.current=false;if(token===statsGeneration.current)setStatsBusy(false);}
       }
-      function openView(key){++diffGeneration.current;setView(key);setDetail(null);setQuery('');setFileSelection([]);if(key==='repos')loadSummaries();}
+      async function loadBranchInfo(target=selected.current){if(target===null)return;const token=++branchGeneration.current;setBranchMetaBusy(true);setBranchMetaError('');setBranchMeta(null);try{const value=await call('branchMetadata',{repository:target});if(token===branchGeneration.current)setBranchMeta({...value,repository:target});}catch(e){if(token===branchGeneration.current)setBranchMetaError(e.message);}finally{if(token===branchGeneration.current)setBranchMetaBusy(false);}}
+      function openView(key){++diffGeneration.current;setView(key);setDetail(null);setQuery('');setFileSelection([]);if(key==='repos')loadSummaries();if(key==='branches')loadBranchInfo();}
       async function refresh(target=selected.current) {
         if(target===null)return;
-        setFileSelection([]);const id=++generation.current;++diffGeneration.current;setDetail(null);setPatchBusy(false);setConfirmation(null);setBusy(true);setError('');setInfo(null);
-        try {const overview=await call('overview',{repository:target});if(id===generation.current){setData(overview.snapshot);setInfo(overview.details);setLastRead(new Date().toLocaleTimeString());}}
+        setFileSelection([]);++branchGeneration.current;setBranchMeta(null);setBranchMetaError('');setBranchMetaBusy(false);const id=++generation.current;++diffGeneration.current;setDetail(null);setPatchBusy(false);setConfirmation(null);setBusy(true);setError('');setInfo(null);
+        try {const overview=await call('overview',{repository:target});if(id===generation.current){setData(overview.snapshot);setInfo(overview.details);setLastRead(new Date().toLocaleTimeString());if(view==='branches')loadBranchInfo(target);}}
         catch(e){if(id===generation.current)setError(e);}
         finally{if(id===generation.current)setBusy(false);}
       }
@@ -96,7 +99,7 @@ window.__ModuleLoader__.load({
           if(target!==null)choose(target);else{selected.current=null;setRepository(null);setData(null);setInfo(null);setDetail(null);setBusy(false);setConfirmation(null);++generation.current;++diffGeneration.current;setPicker(true);}
         }catch(e){if(id===scanGeneration.current)setError(e);}finally{if(id===scanGeneration.current)setScanning(false);}
       }
-      useEffect(()=>{++epoch.current;lock.current=false;selected.current=null;setRepository(null);setRepositories([]);setScanInfo(null);setData(null);setInfo(null);setDetail(null);setBusy(false);setRepoQuery('');setConfirmation(null);setRunning('');setResult(null);setMessage('');setBranch('');setPreview(null);setDiffPage(0);setLastRead('');scanRoot.current='';setRepoFilter('all');setFileSelection([]);scan();return()=>{++epoch.current;++generation.current;++diffGeneration.current;++scanGeneration.current;++statsGeneration.current;};},[sessionId]);
+      useEffect(()=>{++epoch.current;lock.current=false;selected.current=null;setRepository(null);setRepositories([]);setScanInfo(null);setData(null);setInfo(null);setDetail(null);setBusy(false);setRepoQuery('');setConfirmation(null);setRunning('');setResult(null);setMessage('');setBranch('');setPreview(null);setDiffPage(0);setLastRead('');scanRoot.current='';setRepoFilter('all');setFileSelection([]);setBranchMeta(null);setBranchMetaError('');setBranchMetaBusy(false);scan();return()=>{++epoch.current;++generation.current;++diffGeneration.current;++scanGeneration.current;++statsGeneration.current;++branchGeneration.current;};},[sessionId]);
       async function show(options,title){const id=++diffGeneration.current;setDetail({options,title});setPatch('');setPreview(null);setDiffPage(0);setPatchBusy(true);setError('');
         try{const value=await call(options.untracked?'preview':'diff',options.untracked?{path:options.path,repository:selected.current}:{...options,repository:selected.current});if(id===diffGeneration.current){setPatch(value.text??value);setPreview(options.untracked?value:null);}}
         catch(e){if(id===diffGeneration.current){setError(e);setPreview({error:true});}}finally{if(id===diffGeneration.current)setPatchBusy(false);}}
@@ -124,6 +127,9 @@ window.__ModuleLoader__.load({
           h('span',{className:'file-status '+(f.index==='?'||f.index==='A'?'add':f.index==='D'||f.worktree==='D'?'del':''),title:statusNames[isStaged?f.index:f.worktree]||'冲突'},isStaged?f.index:f.worktree),
           button(h('span',{className:'file-name'},f.path,f.oldPath&&h('div',{className:'muted'},`← ${f.oldPath}`)),()=>show({path:f.path,staged:isStaged,...(mode==='untracked'?{untracked:true}:{})},f.path),{className:'file-main',title:'查看 '+f.path+' 的差异'}),
           button(isStaged?'−':'+',()=>propose(isStaged?'unstage':'stage',{paths:paths([f])}),{disabled:!canAct,className:'icon-btn','aria-label':`${isStaged?'取消暂存':'暂存'} ${f.path}`,title:isStaged?'取消暂存':mode==='conflict'?'已在编辑器解决后暂存，标记为已解决':'暂存'}))));}
+      const branchMetadataFresh=branchMeta?.repository===repository&&branchMeta?.head===info?.head;
+      const branchMarks=new Map((branchMetadataFresh?branchMeta?.branches||[]:[]).map(item=>[item.name,item]));
+      const branchReasons={current:'当前分支',worktree:'工作树占用',unmerged:'未合并到 HEAD','no-head':'尚无 HEAD'};
       let list;
       if(view==='repos')list=h(React.Fragment,null,
         h('div',{className:'bar'},h('h3',null,'多仓库状态总览'),button(statsBusy?'读取中…':'刷新总览',()=>loadSummaries(),{disabled:statsBusy||scanning||!!running})),
@@ -144,9 +150,13 @@ window.__ModuleLoader__.load({
         h('section',{className:'commit-box'},h('h3',null,'新建本地分支'),h('p',{className:'hint'},info?.head?`从当前 HEAD ${info.head.slice(0,8)} 创建，不会自动切换。`:'仓库尚无提交，请先创建首次提交再新建分支。'),
           h('div',{className:'new-branch'},h('input',{'aria-label':'新分支名',placeholder:'例如 feature/login',value:branch,onChange:e=>setBranch(e.target.value),disabled:!!running,maxLength:1024}),button('创建分支',()=>propose('createBranch',{branch:branch.trim()}),{className:'primary',disabled:!canAct||!info?.head||!branch.trim()}))),
         h('section',{className:'section',style:{marginTop:18}},h('div',{className:'section-head'},h('h3',null,'本地分支'),h('span',{className:'badge'},data?.branches?.length||0)),h('p',{className:'hint'},'切换要求工作区干净。删除仅限已合并到当前 HEAD 的本地分支；不强删、不删除远程分支。'),
-          ...(data?.branches||[]).filter(matches).map(name=>h('div',{className:'branch-row',key:name},h('span',null,'⑂ ',name,name===data.branch&&h('span',{className:'badge',style:{marginLeft:8}},'当前')),
+          h('div',{className:'bar'},h('span',{className:'hint'},branchMetaBusy?'正在读取分支标记…':branchMetadataFresh?`标记时间 ${new Date(branchMeta.checkedAt).toLocaleTimeString()} · 已合并不代表通过 upstream 检查`:'分支标记待刷新'),button('刷新分支标记',()=>loadBranchInfo(),{disabled:branchMetaBusy||!!running||busy})),
+          branchMetaError&&h('p',{className:'error'},branchMetaError),
+          ...(data?.branches||[]).filter(matches).map(name=>{const mark=branchMarks.get(name);const reason=name===data.branch?'当前分支':mark?(mark.deleteBlockedReason?(branchReasons[mark.deleteBlockedReason]||'分支受保护'):''): '标记未知，请刷新';return h('div',{className:'branch-row',key:name},h('div',null,h('span',null,'⑂ ',name,name===data.branch&&h('span',{className:'badge',style:{marginLeft:8}},'当前')),
+            h('div',{className:'hint'},mark?(mark.merged===true?'已合并到 HEAD':mark.merged===false?'未合并到 HEAD':'合并状态未知'):'状态未读取',mark?.updatedAt?` · ${mark.updatedAt.slice(0,10)}`:''),
+            mark?.worktrees?.length>0&&h('div',{className:'path'},`工作树占用：${mark.worktrees.join('；')}`)),
             h('div',{className:'tools'},name!==data.branch&&button('切换',()=>propose('switchBranch',{branch:name}),{disabled:!canAct||!info?.clean,'aria-label':`切换分支 ${name}`,title:info?.clean?'切换到此分支':'请先提交或保存所有工作区改动'}),
-              button('删除',()=>propose('deleteBranch',{branch:name}),{className:'danger',disabled:!canAct||!info?.head||name===data.branch,'aria-label':`删除分支 ${name}`,title:name===data.branch?'不能删除当前分支':'安全删除此本地分支；未合并或被工作树使用时会拒绝'})))),
+              button('删除',()=>propose('deleteBranch',{branch:name}),{className:'danger',disabled:!canAct||!info?.head||!!reason||!mark,'aria-label':`删除分支 ${name}`,title:reason||'已合并到 HEAD；执行时仍需通过 Git 原生安全检查'})));}),
           !(data?.branches||[]).filter(matches).length&&h('p',{className:'empty'},data?.branches?.length?'没有匹配的本地分支':'还没有本地分支提交')),
         h('section',{className:'section',style:{marginTop:20}},h('h3',null,'远程与同步'),h('p',{className:'hint'},info?.upstream?`跟踪分支：${info.upstream}`:'当前分支未设置 upstream。请在终端配置后刷新；GUI 不猜测远程目标。'),...(info?.remotes||[]).map(r=>h('div',{className:'branch-row',key:r.name},h('span',null,r.name),h('span',{className:'badge'},'已配置远程')))));
       const plainPreview=!!detail?.options.untracked;

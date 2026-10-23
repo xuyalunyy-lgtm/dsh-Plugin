@@ -7,6 +7,7 @@ async function setup({head='a'.repeat(40),failDelete=false}={}){
  const app=await harness(async(action,body)=>{
   if(action==='repositories')return ok(repos);
   if(action==='overview'){const value=overview('alpha');value.snapshot.branches=head?[...branches]:[];value.details.head=head;value.details.clean=true;return ok(value);}
+  if(action==='branchMetadata')return ok({head,checkedAt:'2026-10-23T01:00:00Z',branches:branches.map(name=>({name,tip:head,current:name==='alpha',merged:true,worktrees:[],deleteBlockedReason:name==='alpha'?'current':null}))});
   if(action==='action'){
    if(body.operation==='createBranch')branches.push(body.branch);
    if(body.operation==='deleteBranch'){
@@ -17,7 +18,7 @@ async function setup({head='a'.repeat(40),failDelete=false}={}){
   }
   throw new Error('unexpected action '+action);
  });
- app.render();await app.flush();nodes(app.render()).find(n=>n.props.role==='tab'&&n.props.key==='branches').props.onClick();return app;
+ app.render();await app.flush();nodes(app.render()).find(n=>n.props.role==='tab'&&n.props.key==='branches').props.onClick();await app.flush();return app;
 }
 const input=(tree,label)=>nodes(tree).find(n=>n.type==='input'&&n.props['aria-label']===label);
 

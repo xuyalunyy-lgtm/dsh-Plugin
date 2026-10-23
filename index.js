@@ -40,7 +40,7 @@ function errorStatus(error) {
 }
 
 export function apply(ctx) {
-  for (const route of ['repositories', 'snapshot', 'diff', 'details', 'action', 'overview', 'preview', 'summary']) ctx.connection.fetch.register({
+  for (const route of ['repositories', 'snapshot', 'diff', 'details', 'action', 'overview', 'preview', 'summary', 'branchMetadata']) ctx.connection.fetch.register({
     path: '/api/git-visualizer/' + route,
     methods: ['POST'], requestBody: 'buffered',
     async fetch(request) {
@@ -61,7 +61,7 @@ export function apply(ctx) {
         const root = header.cwd ?? ctx.sandboxPolicy.workspaceRoot;
         if (!root) return reply({ error: '会话没有工作区' }, 400);
         if (route === 'action') validateAction(body);
-        else if ((route === 'details' || route === 'overview' || route === 'summary') && !allowedKeys(body, ['sessionId', 'repository'])) return reply({ error: '请求包含不允许的参数' }, 400);
+        else if ((route === 'details' || route === 'overview' || route === 'summary' || route === 'branchMetadata') && !allowedKeys(body, ['sessionId', 'repository'])) return reply({ error: '请求包含不允许的参数' }, 400);
         else if (route === 'preview' && (!allowedKeys(body, ['sessionId', 'repository', 'path']) || typeof body.path !== 'string' || !body.path || body.path.length > 4096 || body.path.includes('\0'))) return reply({ error: '无效预览参数' }, 400);
         if (route === 'repositories') return reply({ ...await scanRepositories(root), workspaceRoot: root });
         const repository = await selectRepository(root, body.repository === undefined ? '.' : body.repository);
@@ -77,6 +77,7 @@ export function apply(ctx) {
         if (route === 'details') return reply(await new GitActions(repository.path).details());
         const reader = new GitReader(repository.path);
         if (route === 'summary') return reply(await reader.summary());
+        if (route === 'branchMetadata') return reply(await reader.branchMetadata());
         if (route === 'overview') {
           const result = await reader.overview();
           if (result.snapshot.isRepository === false) return reply({ error: '当前会话工作区不是 Git 仓库。请打开已有仓库的会话。' }, 400);

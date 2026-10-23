@@ -114,6 +114,46 @@ export class GitReader {
     return result;
   }
 
+  /** On-demand local branch hints, not authorization for a later deletion.
+   * Merged means reachable from this call's fixed HEAD; Git's native -d upstream
+   * check and all fresh mutation-time validation remain independently required.
+   */
+  async branchMetadata() {
+    if (!await this._isRepository()) throw Object.assign(new Error('Not a Git repository'), { code: 'NOT_GIT_REPOSITORY' });
+    const currentResult = await this._git(['symbolic-ref', '--quiet', 'HEAD'], [1]);
+    const currentRef = currentResult.stdout.trim() || null;
+    const headResult = await this._git(['rev-parse', '--verify', '--quiet', 'HEAD'], [1]);
+    const head = headResult.code === 0 ? headResult.stdout.trim() : null;
+    const refs = await this._git(['for-each-ref', '--format=%(refname)%00%(objectname)%00%(committerdate:iso-strict)', 'refs/heads/']);
+    const mergedRefs = head === null ? null : new Set((await this._git([
+      'for-each-ref', `--merged=${head}`, '--format=%(refname)', 'refs/heads/',
+    ])).stdout.split(/\r?\n/).filter(Boolean));
+    const worktreeResult = await this._git(['worktree', 'list', '--porcelain', '-z']);
+    const worktreesByRef = new Map();
+    let worktreePath = null;
+    // -z terminates individual fields AND records with NUL. Never split paths
+    // on newlines, trim them, or unquote them: path contents are opaque here.
+    for (const field of worktreeResult.stdout.split('\0')) {
+      if (field === '') worktreePath = null;
+      else if (field.startsWith('worktree ')) worktreePath = field.slice(9);
+      else if (field.startsWith('branch refs/heads/') && worktreePath !== null) {
+        const ref = field.slice(7);
+        if (!worktreesByRef.has(ref)) worktreesByRef.set(ref, []);
+        worktreesByRef.get(ref).push(worktreePath);
+      }
+    }
+    const branches = refs.stdout.split(/\r?\n/).filter(Boolean).map(record => {
+      const [ref, tip, updatedAt] = record.split('\0');
+      const current = ref === currentRef;
+      const merged = mergedRefs === null ? null : mergedRefs.has(ref);
+      const worktrees = worktreesByRef.get(ref) || [];
+      const deleteBlockedReason = current ? 'current' : worktrees.length ? 'worktree'
+        : head === null ? 'no-head' : !merged ? 'unmerged' : null;
+      return { name: ref.slice('refs/heads/'.length), tip, updatedAt, current, merged, worktrees, deleteBlockedReason };
+    });
+    return { head, branches, checkedAt: new Date().toISOString() };
+  }
+
   /** { isRepository, branch: string|null, status, branches: string[], commits } */
   async snapshot() {
     return (await this._snapshot()).snapshot;
