@@ -27,12 +27,24 @@ window.__ModuleLoader__.load({
       noteTitle:'How it works', note:'Saved tasks and settings are stored locally and shared across sessions. Closing this panel does not stop timers. System notifications require DSH and this page to stay running. Sleeping computers cannot notify on time; pending reminders appear on return. Task times sort the plan but do not trigger notifications.',
       loading:'Loading calendar…', error:'Operation failed', syncError:'State sync failed', retry:'Retry', saved:'Saved', remaining:'Remaining', shortcut:'Alt + Shift + F opens the calendar', weekdays:'Mo Tu We Th Fr Sa Su', timezone:'Dates use the local time zone', stopFirst:'Reset the current timer before starting a break',
     };
+    Object.assign(zh, {
+      backupTitle:'备份与恢复', exportBackup:'导出 JSON 备份', backupFile:'选择备份 JSON（最大 4 MiB）', backupLocal:'仅在本机处理与下载，不发送到外部服务。未提交草稿不包含在备份中。', previewBackup:'验证并预览', importBackup:'确认导入', importMerge:'合并', importReplace:'替换', mergeHint:'合并保留本机冲突任务和本机设置，仅加入未冲突记录。', importStop:'两种导入模式都会停止专注计时和健康提醒，并清除待显示/延后的提醒。', replaceHint:'替换将覆盖当前任务、回收站和设置；系统会先自动保留一份旧数据恢复副本。', replaceConfirm:'我确认用这份备份替换当前任务、回收站和设置。', previewCounts:'导入预览', backupTasks:'任务数', backupTrash:'回收站记录数', backupRange:'任务日期范围', backupAdded:'可新增记录', backupConflicts:'冲突记录', backupDuplicates:'重复记录', backupSettings:'备份中的设置', previewScope:'新增 / 冲突 / 重复计数包含任务和回收站记录。导入不会延长回收站原 30 天保留期限，已过期记录会过滤。', imported:'导入完成。当前标签页的未提交草稿仍然保留。', invalidBackup:'不是有效的专注日历 v1 备份。', backupTooLarge:'文件不能超过 4 MiB。', backupReadFailed:'读取 JSON 失败，请检查文件。', recoveryTitle:'自动保留的旧恢复副本', recoveryPreview:'预览恢复副本（替换模式）', recoveryHint:'只预览，不会立即恢复；仍需确认替换。', recoveryMissing:'尚无旧恢复副本。', fileReady:'备份已选中，请验证并预览。', previewRequired:'文件或模式改变后需要重新预览。', downloaded:'备份已交给浏览器下载。',
+      trashTitle:'回收站', trashEmpty:'回收站为空。', trashHint:'删除的任务保留 30 天，之后自动过期。导入不会延长原保留期限，过期记录会被过滤。恢复沿用任务原始数据。', deletedAt:'删除时间', retention:'剩余保留天数', restore:'恢复任务', restored:'已恢复到', undoDelete:'撤销删除', purge:'永久删除', purgeConfirm:'确认永久删除', purgeWarning:'永久删除后无法撤销。', purged:'已永久删除',
+      focusTask:'专注此任务', currentTask:'当前专注任务', unlinkedFocus:'未关联任务', focusTotal:'累计专注', focusRounds:'完成轮数', focusSegment:'本段进行中', continueFocus:'继续专注', finishTask:'标记任务完成', focusUnavailable:'请先结束或重置当前计时；已完成任务不能开始专注。', taskUnavailable:'关联任务已不存在或已完成。', snooze5:'稍后 5 分钟', snooze10:'稍后 10 分钟', snoozedTitle:'已延后提醒', snoozedHint:'延后期间不重复通知，到期后重新提醒。', noRange:'无日期',
+    });
+    Object.assign(en, {
+      backupTitle:'Backup & restore', exportBackup:'Export JSON backup', backupFile:'Choose backup JSON (up to 4 MiB)', backupLocal:'Processed and downloaded locally; never sent to external services. Unsaved drafts are not included.', previewBackup:'Validate & preview', importBackup:'Confirm import', importMerge:'Merge', importReplace:'Replace', mergeHint:'Merge keeps local conflicting records and local settings, adding only non-conflicting records.', importStop:'Both modes stop focus timers and health reminders, and clear pending and snoozed alerts.', replaceHint:'Replace overwrites tasks, trash and settings. A recovery copy of the previous data is saved automatically first.', replaceConfirm:'I confirm replacing current tasks, trash and settings with this backup.', previewCounts:'Import preview', backupTasks:'Tasks', backupTrash:'Trash records', backupRange:'Task date range', backupAdded:'New records', backupConflicts:'Conflicts', backupDuplicates:'Duplicates', backupSettings:'Settings in backup', previewScope:'New/conflict/duplicate counts include both tasks and trash records. Import does not extend the original 30-day trash retention; expired records are filtered out.', imported:'Import complete. Unsaved drafts in this tab have been preserved.', invalidBackup:'Not a valid Focus Calendar v1 backup.', backupTooLarge:'The file must not exceed 4 MiB.', backupReadFailed:'Could not read JSON. Check the file.', recoveryTitle:'Previous recovery copy', recoveryPreview:'Preview recovery copy (replace mode)', recoveryHint:'Preview only. Replacement confirmation is still required.', recoveryMissing:'No previous recovery copy yet.', fileReady:'Backup selected. Validate and preview before importing.', previewRequired:'Changing the file or mode requires a fresh preview.', downloaded:'Backup handed to the browser for download.',
+      trashTitle:'Trash', trashEmpty:'Trash is empty.', trashHint:'Deleted tasks are retained for 30 days, then expire automatically. Import does not extend the original retention period; expired records are filtered out. Restore uses the original task data.', deletedAt:'Deleted', retention:'Retention days remaining', restore:'Restore task', restored:'Restored to', undoDelete:'Undo deletion', purge:'Delete permanently', purgeConfirm:'Confirm permanent deletion', purgeWarning:'Permanent deletion cannot be undone.', purged:'Permanently deleted',
+      focusTask:'Focus on task', currentTask:'Current focus task', unlinkedFocus:'No task linked', focusTotal:'Total focus', focusRounds:'Completed rounds', focusSegment:'Current segment', continueFocus:'Continue focusing', finishTask:'Mark task complete', focusUnavailable:'Finish or reset the current timer first. Completed tasks cannot start focus.', taskUnavailable:'The linked task is missing or complete.', snooze5:'Snooze 5 min', snooze10:'Snooze 10 min', snoozedTitle:'Snoozed reminders', snoozedHint:'No repeat notification while snoozed. It will reappear when due.', noRange:'No dates',
+    });
     const css = `
 .fc{height:100%;overflow:auto;box-sizing:border-box;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-base);font-family:inherit;font-size:14px;line-height:1.5;padding:20px clamp(12px,2.5vw,32px)}
 .fc *,.fc-toast *{box-sizing:border-box}.fc-wrap{max-width:1120px;margin:auto}.fc-head,.fc-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.fc-head{justify-content:space-between;margin-bottom:16px}.fc h1{font-size:24px;font-weight:650;margin:0 0 3px}.fc h2{font-size:16px;font-weight:600;margin:0}.fc p{margin:7px 0 12px}.fc-muted{color:var(--dsw-alias-label-secondary);font-size:12px}.fc-grid{display:grid;grid-template-columns:minmax(300px,1.45fr) minmax(240px,1fr);gap:16px;align-items:start}.fc-stack{display:grid;gap:16px;min-width:0}.fc-card{padding:16px;border:1px solid var(--dsw-alias-border-l1);border-radius:14px;background:var(--dsw-alias-bg-layer-1);min-width:0}
 .fc button,.fc input,.fc-toast button{font:inherit;color:var(--dsw-alias-label-primary);border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-1);padding:6px 10px;min-height:34px;max-width:100%}.fc button,.fc-toast button{cursor:pointer}.fc button:hover,.fc-toast button:hover{background:var(--dsw-alias-interactive-bg-hover)}.fc button:disabled,.fc input:disabled,.fc button[aria-disabled=true],.fc-toast button:disabled{opacity:.5;cursor:default}.fc button:focus-visible,.fc input:focus-visible,.fc summary:focus-visible,.fc-toast button:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}.fc .fc-primary{border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary);font-weight:600}.fc-calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-top:10px}.fc-week{text-align:center;color:var(--dsw-alias-label-secondary);font-size:12px;padding:2px}.fc .fc-day{min-height:56px;padding:4px 0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;border-color:transparent}.fc .fc-day[data-selected=true]{border-color:var(--dsw-alias-brand-primary);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-brand-primary)}.fc .fc-day[data-today=true]{font-weight:750}.fc-day small{font-size:10px;line-height:12px;color:var(--dsw-alias-label-secondary)}.fc .fc-day[data-complete=true] small{color:var(--dsw-alias-state-success-primary)}.fc-day em{font-size:9px;line-height:11px;font-style:normal;color:var(--dsw-alias-brand-primary)}
 .fc-datebar{margin-top:12px}.fc-datebar input{flex:1;min-width:130px}.fc-timer{font-size:46px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:2px;margin:10px 0}.fc-status{font-size:12px;color:var(--dsw-alias-brand-primary)}.fc-task{padding:11px 0;border-bottom:1px solid var(--dsw-alias-border-l1);display:flex;gap:9px;align-items:flex-start;flex-wrap:wrap}.fc-task[data-editing=true]{border-left:3px solid var(--dsw-alias-brand-primary);padding-left:8px}.fc-task input[type=checkbox]{min-height:18px;width:18px;height:18px;margin-top:3px;accent-color:var(--dsw-alias-brand-primary)}.fc-task-text{flex:1;min-width:100px;overflow-wrap:anywhere}.fc-task-text[data-done=true]{text-decoration:line-through;color:var(--dsw-alias-label-secondary)}.fc-task-actions{display:flex;gap:5px;flex-wrap:wrap}.fc .fc-small{font-size:12px;padding:4px 7px;min-height:30px}.fc-form{display:grid;gap:9px;margin:12px 0 16px;padding:12px;border:1px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-layer-2)}.fc-form[data-editing=true]{border-color:var(--dsw-alias-brand-primary)}.fc-form input{min-width:0;width:100%}.fc-form label,.fc-settings label{display:grid;gap:4px;font-size:12px}.fc-form-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}.fc-form .fc-hint{margin:0}.fc-form-head{display:flex;justify-content:space-between;gap:8px;align-items:center}.fc-settings{display:grid;grid-template-columns:1fr 1fr;gap:10px}.fc-health{padding:10px 0;border-bottom:1px solid var(--dsw-alias-border-l1);display:flex;justify-content:space-between;align-items:center;gap:10px}.fc-filter{display:flex;gap:5px;flex-wrap:wrap;margin:8px 0}.fc-filter button[aria-pressed=true]{border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary);background:var(--dsw-alias-bg-layer-2)}.fc-progress{height:5px;width:100%;display:block;accent-color:var(--dsw-alias-state-success-primary);margin:8px 0 12px}.fc-notice{display:flex;gap:8px;align-items:center;flex-wrap:wrap;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;padding:8px 10px;margin-bottom:12px;overflow-wrap:anywhere}.fc-notice-text{flex:1;min-width:0}.fc-error{color:var(--dsw-alias-state-error-primary);overflow-wrap:anywhere}.fc-badge{font-size:11px;color:var(--dsw-alias-brand-primary)}.fc-footer{margin-top:18px}.fc-footer summary,.fc-card summary{cursor:pointer}.fc-toast{position:fixed;right:20px;top:70px;width:min(360px,calc(100vw - 40px));max-height:70vh;overflow:auto;pointer-events:auto;color:var(--dsw-alias-label-primary);font-size:14px}.fc-toast article{border:1px solid var(--dsw-alias-brand-primary);border-radius:12px;background:var(--dsw-alias-bg-overlay);padding:16px;margin-bottom:10px}.fc-toast p{margin:8px 0 14px}.fc-toast .fc-row{display:flex;gap:8px;flex-wrap:wrap}@media(max-width:760px){.fc-grid{grid-template-columns:1fr}.fc{padding:12px}.fc-card{padding:12px}.fc-task-actions{margin-left:auto}}@media(max-width:380px){.fc-form-fields,.fc-settings{grid-template-columns:1fr}}
 `;
+
+    const featureCss=`.fc-backup-file{display:grid;gap:6px;margin:14px 0;font-size:12px}.fc-backup-modes{margin:10px 0}.fc-backup-modes label,.fc-confirm{display:flex;align-items:flex-start;gap:7px;font-size:12px}.fc-backup-modes input,.fc-confirm input{width:16px;height:16px;min-height:16px;margin-top:2px;accent-color:var(--dsw-alias-brand-primary)}.fc-confirm{margin:12px 0}.fc-preview,.fc-recovery{margin-top:14px;padding-top:12px;border-top:1px solid var(--dsw-alias-border-l1)}.fc-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:10px 0}.fc-metrics dt{font-size:12px;color:var(--dsw-alias-label-secondary)}.fc-metrics dd{margin:0;font-variant-numeric:tabular-nums}.fc-trash-row{padding:12px 0;border-bottom:1px solid var(--dsw-alias-border-l1);overflow-wrap:anywhere}.fc-trash-row .fc-row{margin-top:8px}.fc-snoozed{margin-top:12px;border-top:1px solid var(--dsw-alias-border-l1);padding-top:10px}.fc-task-focus{font-size:11px;color:var(--dsw-alias-label-secondary)}.fc-current-task{overflow-wrap:anywhere;margin:6px 0}.fc-toast .fc-alert-actions{margin-top:8px}`;
 
     // BEGIN PURE HELPERS — exercised directly by Node tests, without a DOM.
     const dayKey = d => `${String(d.getFullYear()).padStart(4,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -106,6 +118,26 @@ window.__ModuleLoader__.load({
         clearIfUnchanged(key,sent){if (!sameDraft(drafts[key],sent)) return false;delete drafts[key];persist();return true;},
       };
     }
+    const BACKUP_MAX_BYTES=4*1024*1024;
+    function backupShape(value){return !!value&&typeof value==='object'&&!Array.isArray(value)&&value.format==='dsh-focus-calendar'&&value.version===1&&Number.isFinite(value.exportedAt)&&Array.isArray(value.tasks)&&Array.isArray(value.trash)&&!!value.settings&&typeof value.settings==='object'&&!Array.isArray(value.settings);}
+    function parseBackup(text,size){
+      if(size>BACKUP_MAX_BYTES)throw Error('backupTooLarge');
+      let value;try{value=JSON.parse(text.replace(/^\uFEFF/,''));}catch{throw Error('backupReadFailed');}
+      if(!backupShape(value))throw Error('invalidBackup');return value;
+    }
+    function focusStats(task,focus,now){
+      const stored=Number.isFinite(task?.focusMs)?Math.max(0,task.focusMs):0;
+      const active=focus?.kind==='focus'&&focus.status==='running'&&focus.taskId===task?.id&&Number.isFinite(focus.segmentStartedAt)&&Number.isFinite(focus.endsAt);
+      const segment=active?Math.max(0,Math.min(now,focus.endsAt)-focus.segmentStartedAt):0;
+      return {minutes:Math.floor((stored+segment)/60000),rounds:Number.isFinite(task?.focusRounds)?Math.max(0,task.focusRounds):0,segment};
+    }
+    const retentionDays=(deletedAt,now)=>Math.max(0,Math.ceil((deletedAt+30*86400000-now)/86400000));
+    const alertOccurrence=alert=>`${alert.id}:${alert.at}`;
+    function canImport(backup,preview,mode,confirmed){return backupShape(backup)&&!!preview&&typeof preview.token==='string'&&preview.token.length>0&&(mode==='merge'||mode==='replace'&&confirmed);}
+    async function actionThenAck(call,action,args,alertId){
+      const first=await call(action,args);if(!first?.ok)return first;
+      return call('ack',{id:alertId});
+    }
     // END PURE HELPERS
     const fmt = ms => { const s=Math.max(0,Math.ceil(ms/1000));return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; };
     function Icon({size=22}) {return h('svg',{width:size,height:size,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:1.7,'aria-hidden':true},h('rect',{x:3,y:5,width:18,height:17,rx:4}),h('path',{d:'M7 2v6M17 2v6M3 11h18M12 14v3l2 1'}));}
@@ -125,36 +157,133 @@ window.__ModuleLoader__.load({
       const notifySeen=new Set(),notifications=new Set(),notificationTimers=new Set();
       const notify=state=>{
         for(const a of state.alerts){
-          if(notifySeen.has(a.id))continue;notifySeen.add(a.id);
+          const occurrence=alertOccurrence(a);if(notifySeen.has(occurrence))continue;notifySeen.add(occurrence);
           try {
             if(localStorage.getItem('focus-calendar.notifications')!=='yes'||!('Notification'in window)||Notification.permission!=='granted')continue;
-            const key='focus-calendar.notice.'+a.kind;if(localStorage.getItem(key)===a.id)continue;localStorage.setItem(key,a.id);
+            const key='focus-calendar.notice.'+a.kind;if(localStorage.getItem(key)===occurrence)continue;localStorage.setItem(key,occurrence);
             const n=new Notification(t('title'),{body:t(a.kind+'Alert'),tag:'focus-calendar-'+a.kind});
             n.onclick=()=>{window.focus();ctx.layout.selectPanel('focus-calendar');n.close();};notifications.add(n);
             const timer=setTimeout(()=>{n.close();notifications.delete(n);notificationTimers.delete(timer);},15000);notificationTimers.add(timer);
           } catch { /* Notification failures must not hide in-page reminders. */ }
         }
       };
-      async function request(input){
+      async function requestFull(input){
         const response=await fetch('/focus-calendar/api',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(input),signal:abort.signal});
         if(!response.ok)throw Error(`HTTP ${response.status}`);
         const result=await response.json();if(!result.ok)throw Error(result.error||t('error'));
         publish({state:result.state,...(input.action==='read'?{syncError:''}:{error:''}),clock:Date.now(),serverOffset:result.state.now-Date.now()});
-        if(!dead)notify(result.state);return result.state;
+        if(!dead)notify(result.state);return result;
       }
-      function act(action,args={}) {
-        // Background reads never disable a focused input; only mutations set busy.
+      function actFull(action,args={}) {
+        // One serialized transport for old state-only callers and extended responses.
+        // Background reads never disable a focused input; only user actions set busy.
         const mutating=action!=='read';
         const run=queue.then(async()=>{
           if(mutating)publish({busy:true,error:''});
-          try{return await request({action,...args});}
-          catch(e){publish(mutating?{error:e.message}:{syncError:e.message});return null;}
+          try{return await requestFull({action,...args});}
+          catch(e){publish(mutating?{error:e.message}:{syncError:e.message});return {ok:false,error:e.message};}
           finally{if(mutating)publish({busy:false});}
         });
         queue=run.catch(()=>{});return run;
       }
+      async function act(action,args={}) {const result=await actFull(action,args);return result.ok?result.state:null;}
       const useStore=()=>{React.useSyncExternalStore(f=>ctx.locale.subscribe(f),()=>ctx.locale.getSnapshot());return React.useSyncExternalStore(subscribe,()=>snapshot);};
       const button=(key,fn,props={})=>h('button',{type:'button',onClick:fn,...props},t(key));
+
+      function BackupPanel(){
+        const {state:s,busy}=useStore();
+        const [backup,setBackup]=React.useState(null),[preview,setPreview]=React.useState(null),[mode,setMode]=React.useState('merge');
+        const [confirmed,setConfirmed]=React.useState(false),[working,setWorking]=React.useState(''),[localError,setLocalError]=React.useState(''),[message,setMessage]=React.useState('');
+        const file=React.useRef(null),download=React.useRef(null),downloadUrl=React.useRef(null),downloadTimer=React.useRef(null);
+        const active=React.useRef(false),generation=React.useRef(0),operation=React.useRef(null);
+        React.useEffect(()=>{active.current=true;return()=>{active.current=false;generation.current++;if(downloadTimer.current)clearTimeout(downloadTimer.current);if(downloadUrl.current)URL.revokeObjectURL(downloadUrl.current);if(file.current)file.current.value='';};},[]);
+        const resetPreview=()=>{generation.current++;setPreview(null);setConfirmed(false);setLocalError('');setMessage('');};
+        const run=async(kind,fn)=>{
+          if(operation.current)return;operation.current=kind;setWorking(kind);setLocalError('');
+          try{await fn();}catch(e){if(active.current)setLocalError(e.message||t('error'));}
+          finally{operation.current=null;if(active.current)setWorking('');}
+        };
+        const readPreview=async(value,version)=>{
+          const result=await actFull('importPreview',{backup:value});
+          if(!active.current||version!==generation.current)return;
+          if(!result.ok)throw Error(result.error);
+          if(!result.preview||typeof result.preview.token!=='string')throw Error(t('invalidBackup'));
+          setPreview(result.preview);
+        };
+        const chooseFile=event=>{
+          if(operation.current)return;
+          const selected=event.target.files?.[0];resetPreview();setBackup(null);setMode('merge');
+          if(!selected)return;
+          const version=generation.current;
+          run('file',async()=>{
+            if(selected.size>BACKUP_MAX_BYTES)throw Error(t('backupTooLarge'));
+            let value;try{value=parseBackup(await selected.text(),selected.size);}catch(e){throw Error(t(['backupTooLarge','backupReadFailed','invalidBackup'].includes(e.message)?e.message:'backupReadFailed'));}
+            if(!active.current||version!==generation.current)return;
+            setBackup(value);setMessage(t('fileReady'));
+          });
+        };
+        const changeMode=next=>{if(operation.current)return;resetPreview();setMode(next);};
+        const exportFile=()=>run('export',async()=>{
+          const result=await actFull('export');if(!result.ok)throw Error(result.error);if(!active.current)return;
+          if(!backupShape(result.backup))throw Error(t('invalidBackup'));
+          if(downloadTimer.current)clearTimeout(downloadTimer.current);if(downloadUrl.current)URL.revokeObjectURL(downloadUrl.current);
+          const url=URL.createObjectURL(new Blob([JSON.stringify(result.backup,null,2)],{type:'application/json;charset=utf-8'}));
+          downloadUrl.current=url;
+          download.current.href=url;download.current.download=`focus-calendar-${dayKey(new Date())}.json`;download.current.click();
+          downloadTimer.current=setTimeout(()=>{URL.revokeObjectURL(url);if(downloadUrl.current===url)downloadUrl.current=null;downloadTimer.current=null;},30000);
+          setMessage(t('downloaded'));
+        });
+        const recoveryPreview=()=>{
+          if(operation.current)return;resetPreview();setBackup(null);setMode('replace');if(file.current)file.current.value='';const version=generation.current;
+          run('recovery',async()=>{
+            const result=await actFull('recoveryExport');if(!result.ok)throw Error(result.error);
+            if(!active.current||version!==generation.current)return;if(!backupShape(result.backup))throw Error(t('invalidBackup'));
+            setBackup(result.backup);await readPreview(result.backup,version);
+          });
+        };
+        const previewFile=()=>{if(!backup||operation.current)return;resetPreview();const version=generation.current;run('preview',()=>readPreview(backup,version));};
+        const importFile=()=>{
+          if(operation.current||!canImport(backup,preview,mode,confirmed))return;
+          const selected=backup,selectedMode=mode,token=preview.token;
+          run('import',async()=>{
+            const result=await actFull('import',{backup:selected,mode:selectedMode,token});if(!result.ok)throw Error(result.error);
+            if(!active.current)return;
+            resetPreview();setBackup(null);setMode('merge');if(file.current)file.current.value='';setMessage(t('imported'));
+          });
+        };
+        const locked=!!working;
+        const metric=(label,value)=>h('div',{key:label},h('dt',null,t(label)),h('dd',null,String(value??0)));
+        return h('details',{className:'fc-card'},h('summary',null,t('backupTitle')),
+          h('p',{className:'fc-muted'},t('backupLocal')),h('a',{ref:download,hidden:true,'aria-hidden':true}),
+          button('exportBackup',exportFile,{disabled:locked||busy}),
+          h('label',{className:'fc-backup-file'},t('backupFile'),h('input',{ref:file,type:'file',accept:'.json,application/json',disabled:locked,onChange:chooseFile})),
+          h('div',{className:'fc-row fc-backup-modes'},...['merge','replace'].map(value=>h('label',{key:value},h('input',{type:'radio',name:'fc-import-mode',checked:mode===value,disabled:locked,onChange:()=>changeMode(value)}),t(value==='merge'?'importMerge':'importReplace')))),
+          h('p',{className:'fc-muted'},t(mode==='merge'?'mergeHint':'replaceHint')),h('p',{className:'fc-muted'},t('importStop')),
+          backup&&button('previewBackup',previewFile,{disabled:locked||busy}),
+          preview&&h('section',{'aria-label':t('previewCounts'),className:'fc-preview'},h('strong',null,t('previewCounts')),
+            h('dl',{className:'fc-metrics'},metric('backupTasks',preview.taskCount),metric('backupTrash',preview.trashCount),metric('backupAdded',preview.added),metric('backupConflicts',preview.conflicts),metric('backupDuplicates',preview.duplicates)),
+            h('p',{className:'fc-muted'},t('backupRange'),': ',preview.from||t('noRange'),' — ',preview.to||t('noRange')),
+            h('p',{className:'fc-muted'},t('previewScope')),h('strong',null,t('backupSettings')),
+            h('dl',{className:'fc-metrics'},...['focusMinutes','eyeMinutes','bodyMinutes','breakMinutes'].map(key=>metric(key,`${preview.settings?.[key]??'—'} ${t('minutes')}`))),
+            mode==='replace'&&h('label',{className:'fc-confirm'},h('input',{type:'checkbox',checked:confirmed,disabled:locked,onChange:e=>setConfirmed(e.target.checked)}),t('replaceConfirm')),
+            button('importBackup',importFile,{className:'fc-primary',disabled:locked||busy||!canImport(backup,preview,mode,confirmed)})),
+          backup&&!preview&&h('p',{className:'fc-muted'},t('previewRequired')),
+          h('div',{className:'fc-recovery'},h('strong',null,t('recoveryTitle')),s?.recovery?h(React.Fragment,null,
+            h('p',{className:'fc-muted'},new Date(s.recovery.createdAt).toLocaleString(ctx.locale.getLocale().active),' · ',t('backupTasks'),': ',s.recovery.taskCount),
+            button('recoveryPreview',recoveryPreview,{disabled:locked||busy}),h('p',{className:'fc-muted'},t('recoveryHint'))):h('p',{className:'fc-muted'},t('recoveryMissing'))),
+          locked&&h('p',{role:'status',className:'fc-muted'},t('saving')),localError&&h('p',{role:'alert',className:'fc-error'},localError),message&&h('p',{role:'status',className:'fc-muted'},message));
+      }
+      function TrashPanel(){
+        const {state:s,busy,clock}=useStore();const [confirm,setConfirm]=React.useState(null),[message,setMessage]=React.useState(''),[failure,setFailure]=React.useState('');const lock=React.useRef(false),mounted=React.useRef(false);
+        React.useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
+        const run=async(action,item)=>{if(lock.current||busy)return;lock.current=true;setFailure('');try{const result=await actFull(action,{id:item.task.id});if(!mounted.current)return;if(!result.ok){setFailure(result.error);return;}setConfirm(null);setMessage(action==='restore'?t('restored')+' '+item.task.date:t('purged'));}finally{lock.current=false;}};
+        const trash=[...(s?.trash||[])].sort((a,b)=>b.deletedAt-a.deletedAt);
+        return h('details',{className:'fc-card'},h('summary',null,t('trashTitle'),' · ',trash.length),h('p',{className:'fc-muted'},t('trashHint')),
+          trash.length?trash.map(item=>h('article',{className:'fc-trash-row',key:item.task.id},h('strong',null,item.task.title),h('div',{className:'fc-muted'},item.task.date,' ',item.task.time||''),
+            h('div',{className:'fc-muted'},t('deletedAt'),': ',new Date(item.deletedAt).toLocaleString(ctx.locale.getLocale().active)),h('div',{className:'fc-muted'},t('retention'),': ',retentionDays(item.deletedAt,clock+snapshot.serverOffset)),
+            h('div',{className:'fc-row'},button('restore',()=>run('restore',item),{disabled:busy,className:'fc-small'}),confirm===item.task.id?h(React.Fragment,null,h('span',{className:'fc-error'},t('purgeWarning')),button('purgeConfirm',()=>run('trashPurge',item),{disabled:busy,className:'fc-small'}),button('cancel',()=>setConfirm(null),{className:'fc-small'})):button('purge',()=>setConfirm(item.task.id),{disabled:busy,className:'fc-small'})))):h('p',{className:'fc-muted'},t('trashEmpty')),
+          message&&h('p',{role:'status',className:'fc-muted'},message),failure&&h('p',{role:'alert',className:'fc-error'},failure));
+      }
 
       // A stable component identity and draft key prevent polling from remounting inputs.
       function TaskEditor({date,taskId,task,focusToken,onExit,onSaved}) {
@@ -247,7 +376,7 @@ window.__ModuleLoader__.load({
             h('span',null,String(d)),h('small',null,progress?`${progress.done}/${progress.total}`:'\u00a0'),h('em',null,key===today?t('today'):'\u00a0')));
         }
         const errorNotice=(text,kind)=>h('div',{className:'fc-notice fc-error',role:'alert'},h('span',{className:'fc-notice-text'},t(kind==='syncError'?'syncError':'error'),': ',text),button('retry',()=>act('read'),{disabled:busy}),button('dismiss',()=>publish({[kind]:''}),{className:'fc-small'}));
-        return h('section',{className:'fc','aria-label':t('title')},h('style',null,css),h('div',{className:'fc-wrap'},
+        return h('section',{className:'fc','aria-label':t('title')},h('style',null,css+featureCss),h('div',{className:'fc-wrap'},
           h('header',{className:'fc-head'},h('div',null,h('h1',null,t('title')),h('div',{className:'fc-muted'},t('subtitle'))),button('back',()=>ctx.layout.selectPanel(null))),
           error&&errorNotice(error,'error'),syncError&&errorNotice(syncError,'syncError'),
           !s?h('p',{role:'status'},t('loading')):h('div',{className:'fc-grid'},
@@ -261,30 +390,47 @@ window.__ModuleLoader__.load({
               h('section',{className:'fc-card'},
                 h('div',{className:'fc-head',style:{marginBottom:6}},h('div',null,h('h2',null,t('tasks')),h('div',{className:'fc-muted'},date,' · ',chosen.toLocaleDateString(ctx.locale.getLocale().active,{weekday:'long'}))),button('newTask',()=>exitEdit(),{className:'fc-small'})),
                 h('div',{className:'fc-row fc-muted'},`${day.done} / ${day.total} ${t('completed')}`),h('progress',{className:'fc-progress',value:day.done,max:Math.max(1,day.total),'aria-label':t('dateProgress')}),
-                notice&&h('div',{className:'fc-notice',role:'status'},h('span',{className:'fc-notice-text'},t(notice.key),' ',notice.date||''),notice.date&&notice.date!==date&&button('showDate',()=>chooseDate(notice.date),{className:'fc-small'}),button('dismiss',()=>setNotice(null),{className:'fc-small'})),
+                notice&&h('div',{className:'fc-notice',role:'status'},h('span',{className:'fc-notice-text'},t(notice.key),' ',notice.date||''),notice.date&&notice.date!==date&&button('showDate',()=>chooseDate(notice.date),{className:'fc-small'}),notice.undoId&&(s.trash||[]).some(entry=>entry.task.id===notice.undoId)&&button('undoDelete',()=>runTask('restore',{id:notice.undoId},()=>setNotice({key:'restored'})),{className:'fc-small',disabled:busy}),button('dismiss',()=>setNotice(null),{className:'fc-small'})),
                 h(TaskEditor,{key:editing?'edit:'+editing:'new:'+date,date,taskId:editing,task,focusToken,onExit:()=>exitEdit(),onSaved:(next,wasEditing,keepFocus)=>{setNotice(next);if(wasEditing)setFocusToken(current=>({key:keepFocus?'new:'+drafts.getView().date:null,nonce:current.nonce+1}));}}),
                 h('div',{className:'fc-filter',role:'group','aria-label':t('filter')},...['all','pending','done'].map(value=>h('button',{type:'button',key:value,className:'fc-small','aria-pressed':filter===value,onClick:()=>setCurrent({filter:value})},t(value==='done'?'completed':value),' ',value==='all'?day.total:value==='done'?day.done:day.total-day.done))),
                 tasks.length?tasks.map(item=>h('div',{className:'fc-task',key:item.id,'data-editing':editing===item.id},
                   h('input',{type:'checkbox',checked:item.done,disabled:busy,'aria-label':t(item.done?'undo':'complete')+': '+item.title,onChange:e=>runTask('update',{id:item.id,done:e.target.checked})}),
-                  h('div',{className:'fc-task-text','data-done':item.done},h('div',null,item.title),h('div',{className:'fc-muted'},item.time||t('allDay'))),
-                  h('div',{className:'fc-task-actions'},button('edit',()=>beginEdit(item),{className:'fc-small',disabled:busy,'aria-label':t('edit')+': '+item.title}),
-                    deleting===item.id?h(React.Fragment,null,button('confirmDelete',()=>runTask('delete',{id:item.id},()=>{drafts.drop('edit:'+item.id);setDeleting(null);if(drafts.getView().editing===item.id)exitEdit(false);setNotice({key:'deleted'});}),{className:'fc-small',disabled:busy}),button('cancel',()=>setDeleting(null),{className:'fc-small'})):button('remove',()=>setDeleting(item.id),{className:'fc-small',disabled:busy,'aria-label':t('remove')+': '+item.title}))
+                  h('div',{className:'fc-task-text','data-done':item.done},h('div',null,item.title),h('div',{className:'fc-muted'},item.time||t('allDay')),h('div',{className:'fc-task-focus'},t('focusTotal'),': ',focusStats(item,s.focus,now).minutes,' ',t('minutes'),' · ',t('focusRounds'),': ',focusStats(item,s.focus,now).rounds),focusStats(item,s.focus,now).segment>0&&h('div',{className:'fc-task-focus'},t('focusSegment'),': ',fmt(focusStats(item,s.focus,now).segment))),
+                  h('div',{className:'fc-task-actions'},button('focusTask',()=>runTask('focusStart',{id:item.id}),{className:'fc-small',disabled:busy||item.done||s.focus.status!=='idle',title:item.done||s.focus.status!=='idle'?t('focusUnavailable'):t('focusTask')}),button('edit',()=>beginEdit(item),{className:'fc-small',disabled:busy,'aria-label':t('edit')+': '+item.title}),
+                    deleting===item.id?h(React.Fragment,null,button('confirmDelete',()=>runTask('delete',{id:item.id},()=>{drafts.drop('edit:'+item.id);setDeleting(null);if(drafts.getView().editing===item.id)exitEdit(false);setNotice({key:'deleted',undoId:item.id});}),{className:'fc-small',disabled:busy}),button('cancel',()=>setDeleting(null),{className:'fc-small'})):button('remove',()=>setDeleting(item.id),{className:'fc-small',disabled:busy,'aria-label':t('remove')+': '+item.title}))
                 )):h('p',{className:'fc-muted'},t(day.total===0?'empty':filter==='pending'?'noPending':'noCompleted')))),
             h('div',{className:'fc-stack'},
-              h('section',{className:'fc-card'},h('h2',null,t('focus')),h('p',{className:'fc-muted'},t('focusHint')),h('div',{className:'fc-status'},t(s.focus.status==='idle'?'idle':s.focus.status==='paused'?'paused':s.focus.kind==='break'?'breaking':'running')),h('div',{className:'fc-timer','aria-label':t('remaining')},fmt(remaining)),
+              h('section',{className:'fc-card'},h('h2',null,t('focus')),h('p',{className:'fc-muted'},t('focusHint')),s.focus.status!=='idle'&&s.focus.taskId&&h('div',{className:'fc-current-task'},t('currentTask'),': ',s.tasks.find(item=>item.id===s.focus.taskId)?.title||t('taskUnavailable')),h('div',{className:'fc-status'},t(s.focus.status==='idle'?'idle':s.focus.status==='paused'?'paused':s.focus.kind==='break'?'breaking':'running')),h('div',{className:'fc-timer','aria-label':t('remaining')},fmt(remaining)),
                 h('div',{className:'fc-row'},s.focus.status==='running'?button('pause',()=>act('focusPause'),{disabled:busy}):s.focus.status==='paused'?button('resume',()=>act('focusResume'),{disabled:busy,className:'fc-primary'}):button('start',()=>act('focusStart'),{disabled:busy,className:'fc-primary'}),button('reset',()=>act('focusReset'),{disabled:busy||s.focus.status==='idle'}),button('rest',()=>act('breakStart'),{disabled:busy||s.focus.status!=='idle',title:t('stopFirst')}))),
-              h('section',{className:'fc-card'},h('h2',null,t('reminders')),...['eye','body'].map(kind=>h('div',{className:'fc-health',key:kind},h('div',null,h('strong',null,t(kind)),h('div',{className:'fc-muted'},t('interval'),' ',s.settings[kind+'Minutes'],' ',t('minutes'),' · ',s.reminders[kind].running?fmt(s.reminders[kind].nextAt-now):t('off'))),h('button',{type:'button',role:'switch','aria-checked':s.reminders[kind].running,'aria-label':t(kind),disabled:busy,onClick:()=>act(s.reminders[kind].running?'remindersStop':'remindersStart',{kind})},t(s.reminders[kind].running?'disable':'enable')))),h('p',null,button('notify',permission,{className:'fc-small'})),message&&h('p',{className:'fc-muted',role:'status'},message)),
+              h('section',{className:'fc-card'},h('h2',null,t('reminders')),...['eye','body'].map(kind=>h('div',{className:'fc-health',key:kind},h('div',null,h('strong',null,t(kind)),h('div',{className:'fc-muted'},t('interval'),' ',s.settings[kind+'Minutes'],' ',t('minutes'),' · ',s.reminders[kind].running?fmt(s.reminders[kind].nextAt-now):t('off'))),h('button',{type:'button',role:'switch','aria-checked':s.reminders[kind].running,'aria-label':t(kind),disabled:busy,onClick:()=>act(s.reminders[kind].running?'remindersStop':'remindersStart',{kind})},t(s.reminders[kind].running?'disable':'enable')))),(s.snoozed||[]).length>0&&h('div',{className:'fc-snoozed'},h('strong',null,t('snoozedTitle')),h('p',{className:'fc-muted'},t('snoozedHint')),...s.snoozed.map(alert=>h('div',{className:'fc-muted',key:alert.id},t(alert.kind+'Alert'),' · ',fmt(alert.dueAt-now)))),h('p',null,button('notify',permission,{className:'fc-small'})),message&&h('p',{className:'fc-muted',role:'status'},message)),
+              h(BackupPanel),h(TrashPanel),
               h('details',{className:'fc-card'},h('summary',null,t('settings')),h('form',{className:'fc-form',onSubmit:async e=>{e.preventDefault();if(await act('settings',{settings:settings||s.settings})){setSettings(null);setMessage(t('saved'));}}},h('div',{className:'fc-settings'},...['focusMinutes','eyeMinutes','bodyMinutes','breakMinutes'].map(key=>h('label',{key},t(key)+' ('+t('minutes')+')',h('input',{type:'number',min:1,max:240,step:1,required:true,value:(settings||s.settings)[key],readOnly:busy,onChange:e=>setSettings({...s.settings,...settings,[key]:e.target.value===''?'':Number(e.target.value)})})))),h('p',{className:'fc-muted'},t('settingsHint')),h('button',{type:'submit',disabled:busy},t('save')))))
           ),
           h('details',{className:'fc-footer fc-muted'},h('summary',null,t('noteTitle')),h('p',null,t('note')),h('p',null,t('draftHint'))),h('p',{className:'fc-muted'},t('shortcut'),' · ',t('timezone'))));
       }
-      function Alerts(){const {state:s,busy,error}=useStore();if(!s?.alerts.length)return null;return h('aside',{className:'fc-toast','aria-label':t('reminders')},h('style',null,css),...s.alerts.map(a=>h('article',{key:a.id,role:'status'},h('strong',null,t('title')),h('p',null,t(a.kind+'Alert')),h('div',{className:'fc-row'},button('ack',()=>act('ack',{id:a.id}),{disabled:busy}),button('open',()=>ctx.layout.selectPanel('focus-calendar'))))),error&&h('p',{className:'fc-error',role:'alert'},error));}
+      function Alerts(){
+        const {state:s,busy,error}=useStore();const lock=React.useRef(false);
+        const run=async(fn)=>{if(lock.current||busy)return;lock.current=true;try{await fn();}finally{lock.current=false;}};
+        if(!s?.alerts.length)return null;
+        return h('aside',{className:'fc-toast','aria-label':t('reminders')},h('style',null,css+featureCss),...s.alerts.map(a=>{
+          const task=a.taskId?s.tasks.find(item=>item.id===a.taskId):null;
+          const canContinue=s.focus.status==='idle'&&(!a.taskId||task&&!task.done);
+          return h('article',{key:a.id,role:'status'},h('strong',null,t('title')),h('p',null,t(a.kind+'Alert')),
+            a.taskId&&h('p',null,task?.title||t('taskUnavailable')),
+            a.kind==='focus'&&h('div',{className:'fc-row fc-alert-actions'},
+              button('continueFocus',()=>run(()=>actionThenAck(actFull,'focusStart',a.taskId?{id:a.taskId}:{},a.id)),{disabled:busy||!canContinue,title:!canContinue?t('focusUnavailable'):t('continueFocus')}),
+              button('rest',()=>run(()=>actionThenAck(actFull,'breakStart',{},a.id)),{disabled:busy||s.focus.status!=='idle',title:t('stopFirst')}),
+              a.taskId&&button('finishTask',()=>run(()=>actionThenAck(actFull,'update',{id:a.taskId,done:true},a.id)),{disabled:busy||!task||task.done})),
+            h('div',{className:'fc-row fc-alert-actions'},button('snooze5',()=>run(()=>actFull('snooze',{id:a.id,minutes:5})),{disabled:busy}),button('snooze10',()=>run(()=>actFull('snooze',{id:a.id,minutes:10})),{disabled:busy})),
+            h('div',{className:'fc-row fc-alert-actions'},button('ack',()=>run(()=>actFull('ack',{id:a.id})),{disabled:busy}),button('open',()=>ctx.layout.selectPanel('focus-calendar'))));
+        }),error&&h('p',{className:'fc-error',role:'alert'},error));
+      }
       ctx.slots.inject('sidebar.panellist',()=>ctx.slots.register({name:'sidebar.panellist',id:'focus-calendar',order:15,label:()=>t('title')},Icon));
       ctx.slots.inject('main',()=>ctx.slots.register({name:'main',key:'focus-calendar'},Panel));
       ctx.slots.inject('shell.overlay',()=>ctx.slots.register({name:'shell.overlay',id:'focus-calendar-alerts',order:30},Alerts));
       ctx.effect(()=>{
         let active=true;
-        async function poll(){if(!active)return;await act('read');if(active)pollTimer=setTimeout(poll,snapshot.state&&(snapshot.state.focus.status==='running'||snapshot.state.reminders.eye.running||snapshot.state.reminders.body.running)?2000:10000);}
+        async function poll(){if(!active)return;await act('read');if(active)pollTimer=setTimeout(poll,snapshot.state&&(snapshot.state.focus.status==='running'||snapshot.state.reminders.eye.running||snapshot.state.reminders.body.running||(snapshot.state.snoozed||[]).length)?2000:10000);}
         poll();const tick=setInterval(()=>publish({clock:Date.now()}),1000);
         const key=e=>{if(e.altKey&&e.shiftKey&&e.code==='KeyF'&&!e.repeat){e.preventDefault();ctx.layout.selectPanel('focus-calendar');}};
         window.addEventListener('keydown',key);

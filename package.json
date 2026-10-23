@@ -1,12 +1,14 @@
 {
   "name": "dsh-focus-calendar",
-  "version": "1.1.0",
-  "description": "专注日历：每日待办、专注计时、护眼与活动提醒",
+  "version": "1.2.0",
+  "description": "专注日历：待办与任务专注、休息提醒、删除撤销和数据备份恢复",
   "private": true,
   "type": "module",
   "exports": {".": "./index.js", "./client": "./client.js", "./locale/*.json": "./locale/*.json", "./icon": "./icon.svg"},
-  "files": ["index.js", "state.js", "client.js", "cordis.patch.yml", "locale/*.json", "icon.svg"],
+  "files": ["index.js", "state.js", "client.js", "cordis.patch.yml", "locale/*.json", "icon.svg", "RESTORE.md"],
   "dependencies": {"zod": "4.4.3"},
+  "bundledDependencies": ["zod"],
+  "scripts": {"test": "node --test *.test.js", "check": "node --check index.js && node --check state.js && node --check client.js"},
   "dsh": {
     "bundle": {"patch": "./cordis.patch.yml"},
     "client": {"platform": "web", "immediately": true, "inject": ["@deepseek-ai/dsh-client-ui-sidebar", "@deepseek-ai/dsh-client-ui-layout", "@deepseek-ai/dsh-client-locale"]}

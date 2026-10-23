@@ -6,3 +6,6 @@ Thumbs.db
 .env.*
 !.env.example
 coverage/
+artifacts/
+.pack-verify-*/
+*.tgz

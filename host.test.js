@@ -21,7 +21,7 @@ test('connection rejection prevents execution even for correctly shaped requests
 test('authenticated transport rejects method/content type/invalid JSON/oversized body', async () => {
   let calls = 0;
   const handler = createHttpHandler({ requestRejection: () => undefined }, async () => { calls++; });
-  const cases = [[request('{}', 'GET'), 405], [request('{}', 'POST', 'text/plain'), 415], [request('bad'), 400], [request('x'.repeat(32769)), 413]];
+  const cases = [[request('{}', 'GET'), 405], [request('{}', 'POST', 'text/plain'), 415], [request('bad'), 400], [request('x'.repeat(5*1024*1024+1)), 413]];
   for (const [req, code] of cases) { const res = response(); await handler(req, res); assert.equal(res.status, code); }
   assert.equal(calls, 0);
 });
