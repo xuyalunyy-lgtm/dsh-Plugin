@@ -6,11 +6,13 @@ const assets = require('./pdf-assets.json');
 const {findMatches, pdfPageText, intersections, decodeMarkdown} = require('./search.mjs');
 const {matchPosition, nextMatchIndex, matchJumpTarget, isComposingKey} = require('./match-navigation.mjs');
 const {RESULTS_PAGE_SIZE, buildLineStarts, createResultPage, listScrollForItem} = require('./result-list.mjs');
+const {documentViewKey, normalizeViewState, createViewStateCache, createScrollCoordinator} = require('./view-state.mjs');
 const css = require('./style.css');
 const zh = require('../locale/zh.json');
 const en = require('../locale/en.json');
 const h = React.createElement;
-const {useState, useEffect, useMemo, useRef} = React;
+const {useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback} = React;
+const EMPTY_PAGES = [];
 const ID = 'dsh-document-search';
 function asset(name) {
   const raw = assets[name];
@@ -28,14 +30,14 @@ function marks(text, matches, active, prefix='') {
   });
   out.push(text.slice(offset)); return out;
 }
-function PdfPage({doc, pageNumber, record, matches, active, reveal, t}) {
+function PdfPage({doc, pageNumber, record, matches, active, intentRevision, onRenderStart, onReady, t}) {
   const canvas=useRef(null), layer=useRef(null), shell=useRef(null);
   const [width,setWidth]=useState(600), [error,setError]=useState(''), [ready,setReady]=useState(0);
   const textLayer=useRef(null);
   useEffect(()=>{const observer=new ResizeObserver(entries=>setWidth(Math.max(160,entries[0].contentRect.width)));observer.observe(shell.current);return ()=>observer.disconnect();},[]);
   useEffect(()=>{
     let cancelled=false, renderTask, tl;
-    setError(''); textLayer.current=null;
+    setError(''); textLayer.current=null;onRenderStart();
     (async()=>{
       const page=await doc.getPage(pageNumber); if(cancelled)return;
       const base=page.getViewport({scale:1});
@@ -54,7 +56,7 @@ function PdfPage({doc, pageNumber, record, matches, active, reveal, t}) {
       if(!cancelled){textLayer.current=tl;setReady(x=>x+1);}
     })().catch(e=>{if(!cancelled)setError(String(e.message||e));});
     return ()=>{cancelled=true;renderTask?.cancel();tl?.cancel();textLayer.current=null;};
-  },[doc,pageNumber,record,width]);
+  },[doc,pageNumber,record,width,onRenderStart]);
   useEffect(()=>{
     const tl=textLayer.current; if(!tl)return;
     tl.textDivs.forEach((div,i)=>{
@@ -65,8 +67,10 @@ function PdfPage({doc, pageNumber, record, matches, active, reveal, t}) {
       for(const m of slices){nodes.push(document.createTextNode(text.slice(offset,m.start)));const mark=document.createElement('mark');mark.textContent=text.slice(m.start,m.end);mark.dataset.hit=String(m.index);if(m.index===active)mark.dataset.active='true';nodes.push(mark);offset=m.end;}
       nodes.push(document.createTextNode(text.slice(offset))); div.replaceChildren(...nodes);
     });
-    layer.current.querySelector('[data-active="true"]')?.scrollIntoView({block:'nearest',inline:'nearest'});
-  },[record,matches,active,ready,reveal]);
+    // Restoration and explicit navigation are separate intents. Updating marks
+    // (or redrawing after resize) must not itself override a restored scroll.
+    onReady();
+  },[record,matches,active,ready,intentRevision,onReady]);
   return h('div',{ref:shell,className:'dbs-pdf-shell'},error&&h('p',{role:'alert'},t('renderError')+' '+error),h('div',{className:'dbs-pdf-page'},h('canvas',{ref:canvas,'aria-label':t('page')+' '+pageNumber}),h('div',{ref:layer,className:'dbs-textLayer'})));
 }
 function ResultList({listing,current,t,onSelect}) {
@@ -92,22 +96,47 @@ function ResultList({listing,current,t,onSelect}) {
         h('mark',null,item.match,item.matchTruncated?'…':''),item.after,item.trailingEllipsis?'…':'')));
   }));
 }
-function Reader({content,resourceAddress,scrollportRef,isPdf,t}) {
-  const [query,setQuery]=useState(''),[sensitive,setSensitive]=useState(false),[current,setCurrent]=useState(0),[page,setPage]=useState(1);
-  const [state,setState]=useState({loading:true,pages:[],doc:null,error:''});
-  const [jumpValue,setJumpValue]=useState(''),[jumpError,setJumpError]=useState(''),[reveal,setReveal]=useState(0);
-  const [listExpanded,setListExpanded]=useState(false),[listPage,setListPage]=useState(0);
-  const scroll=useRef(null), input=useRef(null), jumpComposing=useRef(false);
+function ReaderEntry(props) {
+  const {tab}=props.useTabInfo();
+  const key=documentViewKey(props.sessionId,tab.id,props.resourceAddress);
+  return h(Reader,{...props,key,viewKey:key,tabSignal:tab.signal});
+}
+function revealWithinScrollport(node) {
+  const target=node.querySelector('[data-active="true"]');if(!target)return;
+  const parent=node.getBoundingClientRect(),rect=target.getBoundingClientRect();
+  const top=rect.top-parent.top-node.clientTop+node.scrollTop,left=rect.left-parent.left-node.clientLeft+node.scrollLeft;
+  node.scrollTop=listScrollForItem(node.scrollTop,node.clientHeight,top,rect.height);
+  node.scrollLeft=listScrollForItem(node.scrollLeft,node.clientWidth,left,rect.width);
+}
+function Reader({content,resourceAddress,scrollportRef,isPdf,t,viewCache,viewKey,tabSignal}) {
+  const [initial]=useState(()=>normalizeViewState(viewCache.read(viewKey)));
+  const [view,setView]=useState(()=>({...initial,focusFirst:false,focusSavedMatch:initial.pendingReveal===true}));
+  const {query,sensitive,listExpanded}=view;
+  const [state,setState]=useState({loading:true,pages:[],doc:null,error:'',source:null,epoch:0});
+  const [jumpValue,setJumpValue]=useState(''),[jumpError,setJumpError]=useState('');
+  const [coordinator]=useState(()=>createScrollCoordinator(initial));
+  const [intentRevision,setIntentRevision]=useState(0);
+  const scroll=useRef(null),input=useRef(null),jumpComposing=useRef(false),leaseRef=useRef(null),latestView=useRef(initial);
+  const ownerRef=useRef(scrollportRef);ownerRef.current=scrollportRef;
+  const ref=useCallback(node=>{scroll.current=node;ownerRef.current?.(node);},[]);
   const jumpErrorId=React.useId(), resultListId=React.useId();
   const data=content.kind==='bytes'?content.data:null;
+  const currentSource=useRef(data),displayedPage=useRef(1);currentSource.current=data;
+  const saveView=useCallback(()=>leaseRef.current?.save({...latestView.current,...coordinator.snapshot()}),[coordinator]);
+  useEffect(()=>{
+    const lease=viewCache.retain(viewKey,tabSignal);leaseRef.current=lease;
+    return ()=>{lease.save({...latestView.current,...coordinator.snapshot()});lease.release();if(leaseRef.current===lease)leaseRef.current=null;};
+  },[viewCache,viewKey,tabSignal,coordinator]);
   useEffect(()=>{
     let disposed=false,task;
-    setQuery('');setCurrent(0);setPage(1);setListExpanded(false);setListPage(0);setState({loading:true,pages:[],doc:null,error:''});
+    const epoch=coordinator.beginLoad();setIntentRevision(coordinator.revision);
+    setJumpValue('');setJumpError('');jumpComposing.current=false;
+    setState({loading:true,pages:[],doc:null,error:'',source:data,epoch});
     (async()=>{
       if(!data)throw new Error(t('bytesRequired'));
-      if(!isPdf){const text=decodeMarkdown(data);if(!disposed)setState({loading:false,pages:[{text}],doc:null,error:''});return;}
+      if(!isPdf){const text=decodeMarkdown(data);if(!disposed)setState({loading:false,pages:[{text}],doc:null,error:'',source:data,epoch});return;}
       task=pdfjs.getDocument({data:data.slice(),useWorkerFetch:false,CMapReaderFactory,StandardFontDataFactory,isEvalSupported:false,useWasm:false});
-      task.onPassword=()=>{if(!disposed)setState({loading:false,pages:[],doc:null,error:t('password')});task.destroy().catch(()=>{});};
+      task.onPassword=()=>{if(!disposed)setState({loading:false,pages:[],doc:null,error:t('password'),source:data,epoch});task.destroy().catch(()=>{});};
       const doc=await task.promise;
       const pages=[];
       for(let n=1;n<=doc.numPages;n++){
@@ -115,24 +144,69 @@ function Reader({content,resourceAddress,scrollportRef,isPdf,t}) {
         const p=await doc.getPage(n), textContent=await p.getTextContent();
         pages.push({...pdfPageText(textContent.items),content:textContent});
       }
-      if(!disposed)setState({loading:false,pages,doc,error:''});
-    })().catch(e=>{if(!disposed)setState({loading:false,pages:[],doc:null,error:String(e.message||e)});});
+      if(!disposed)setState({loading:false,pages,doc,error:'',source:data,epoch});
+    })().catch(e=>{if(!disposed)setState({loading:false,pages:[],doc:null,error:String(e.message||e),source:data,epoch});});
     return ()=>{disposed=true;task?.destroy().catch(()=>{});};
-  },[data,resourceAddress,isPdf]);
-  const results=useMemo(()=>state.pages.flatMap((p,i)=>findMatches(p.text,query,sensitive).map(m=>({...m,page:i+1}))),[state.pages,query,sensitive]);
+  },[data,resourceAddress,isPdf,coordinator]);
+  const loading=state.source!==data||state.loading,error=state.source===data?state.error:'';
+  const ready=!loading&&!error,pages=ready?state.pages:EMPTY_PAGES;
+  const results=useMemo(()=>pages.flatMap((p,i)=>findMatches(p.text,query,sensitive).map(m=>({...m,page:i+1}))),[pages,query,sensitive]);
+  // Clamp before rendering any page or hit, not in a later effect: the document
+  // may have shrunk while its tab was hidden or its source was reloaded.
+  const safeView=normalizeViewState(view,ready?{totalMatches:results.length,totalPages:pages.length}:undefined);
+  const current=safeView.current,listPage=safeView.listPage;
+  const focusedMatch=view.focusFirst?results[0]:view.focusSavedMatch?results[current]:undefined;
+  const page=ready&&focusedMatch?focusedMatch.page:safeView.page;
+  displayedPage.current=page;
   const pageMatches=useMemo(()=>results.filter(m=>m.page===page),[results,page]);
-  const position=matchPosition(query,results.length,current,state);
-  const markdownLineStarts=useMemo(()=>isPdf?undefined:buildLineStarts(state.pages[0]?.text||''),[state.pages,isPdf]);
-  const listing=useMemo(()=>listExpanded&&position.status==='matched'?createResultPage(state.pages,results,listPage,{isPdf,lineStarts:markdownLineStarts}):null,[listExpanded,position.status,state.pages,results,listPage,isPdf,markdownLineStarts]);
+  const position=matchPosition(query,results.length,current,{loading,error});
+  const markdownLineStarts=useMemo(()=>isPdf?undefined:buildLineStarts(pages[0]?.text||''),[pages,isPdf]);
+  const listing=useMemo(()=>listExpanded&&position.status==='matched'?createResultPage(pages,results,listPage,{isPdf,lineStarts:markdownLineStarts}):null,[listExpanded,position.status,pages,results,listPage,isPdf,markdownLineStarts]);
   const active=position.status==='matched'?results[position.current-1]:undefined;
   const pageActive=active?.page===page?pageMatches.indexOf(active):-1;
-  const changeQuery=value=>{setQuery(value);setCurrent(0);};
-  useEffect(()=>{if(results[0])setPage(results[0].page);setCurrent(0);setJumpValue('');setJumpError('');setListPage(0);jumpComposing.current=false;},[results]);
-  useEffect(()=>{if(!isPdf)scroll.current?.querySelector('[data-active="true"]')?.scrollIntoView({block:'nearest',inline:'nearest'});},[current,results,isPdf,reveal]);
+  useLayoutEffect(()=>{
+    latestView.current=normalizeViewState({...view,current,page,listPage});
+    if(ready&&(view.current!==current||view.page!==page||view.listPage!==listPage||view.focusFirst||view.focusSavedMatch)) {
+      setView(value=>({...value,current,page,listPage,focusFirst:false,focusSavedMatch:false}));
+    }
+  },[view,current,page,listPage,ready]);
+  useEffect(()=>{saveView();},[query,sensitive,current,page,listExpanded,listPage,saveView]);
+  const renderStarted=useCallback(()=>{
+    if(ready&&state.source===currentSource.current&&page===displayedPage.current)coordinator.renderStarted(state.epoch);
+  },[ready,state.source,state.epoch,page,coordinator]);
+  const finishReady=useCallback(()=>{
+    if(!ready||state.source!==currentSource.current||page!==displayedPage.current||!scroll.current)return;
+    const intent=coordinator.plan(state.epoch,intentRevision);if(!intent)return;
+    const node=scroll.current;
+    if(intent.kind==='restore'){node.scrollTop=intent.scrollTop;node.scrollLeft=intent.scrollLeft;}
+    else if(intent.kind==='reveal')revealWithinScrollport(node);
+    if(coordinator.complete(state.epoch,intent.token,{scrollTop:node.scrollTop,scrollLeft:node.scrollLeft}))saveView();
+  },[ready,state.source,state.epoch,page,intentRevision,coordinator,saveView]);
+  useLayoutEffect(()=>{if(!isPdf&&ready)finishReady();},[isPdf,ready,results,intentRevision,finishReady]);
+  const captureScroll=event=>{
+    if(event.target!==event.currentTarget||!ready||state.source!==currentSource.current)return;
+    const node=event.currentTarget;
+    if(coordinator.capture(state.epoch,{scrollTop:node.scrollTop,scrollLeft:node.scrollLeft}))saveView();
+  };
+  const changeQuery=(value,nextSensitive=sensitive)=>{
+    setIntentRevision(coordinator.reveal());
+    setView(previous=>({...previous,query:value,sensitive:nextSensitive,current:0,listPage:0,focusFirst:true,focusSavedMatch:false}));
+    setJumpValue('');setJumpError('');jumpComposing.current=false;
+  };
+  const changePage=next=>{
+    setIntentRevision(coordinator.restore({scrollTop:0,scrollLeft:0}));
+    setView(previous=>({...previous,page:next,focusFirst:false,focusSavedMatch:false}));
+  };
+  const setListPage=next=>setView(previous=>({...previous,listPage:next}));
+  const toggleList=()=>setView(previous=>({...previous,listExpanded:!previous.listExpanded,listPage:!previous.listExpanded?Math.floor(Math.max(0,position.current-1)/RESULTS_PAGE_SIZE):previous.listPage}));
   const counterText=position.status==='matched'?t('matchCount',{current:position.current,total:position.total}):t({idle:'idle',empty:'noMatches',loading:'indexing',error:'searchUnavailable'}[position.status]);
-  // All match navigation shares the same current-item and PDF-page update.
-  // A reveal revision also repositions an already-selected match after manual scrolling.
-  const selectMatch=index=>{const target=results[index];if(!target)return;setCurrent(index);setPage(target.page);setListPage(Math.floor(index/RESULTS_PAGE_SIZE));setJumpError('');setReveal(value=>value+1);};
+  // Every explicit navigation supersedes a pending scroll restoration.
+  const selectMatch=index=>{
+    const target=results[index];if(!target)return;
+    setIntentRevision(coordinator.reveal());
+    setView(previous=>({...previous,current:index,page:target.page,listPage:Math.floor(index/RESULTS_PAGE_SIZE),focusFirst:false,focusSavedMatch:false}));
+    setJumpError('');
+  };
   const move=delta=>{if(!results.length)return;setJumpError('');selectMatch(nextMatchIndex(current,delta,results.length));};
   const jump=()=>{
     if(jumpComposing.current||position.status!=='matched')return;
@@ -140,13 +214,12 @@ function Reader({content,resourceAddress,scrollportRef,isPdf,t}) {
     if(!target.ok){setJumpError(target.error);return;}
     setJumpError('');setJumpValue(String(target.ordinal));selectMatch(target.index);
   };
-  const ref=node=>{scroll.current=node;scrollportRef?.(node);};
   const button=(label,click,disabled)=>h('button',{type:'button',onClick:click,disabled,'aria-label':label,title:label},label);
   return h('section',{className:'dbs-root',onKeyDown:e=>{
     if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='f'){e.preventDefault();e.stopPropagation();input.current?.focus();input.current?.select();}
   }},h('style',null,css),
-    h('div',{className:'dbs-toolbar'},h('label',null,t('find'),h('input',{ref:input,type:'search',value:query,placeholder:t('placeholder'),disabled:state.loading||!!state.error,onChange:e=>changeQuery(e.target.value),onKeyDown:e=>{if(e.key==='Enter'&&!e.nativeEvent.isComposing){e.preventDefault();move(e.shiftKey?-1:1);}if(e.key==='Escape'){changeQuery('');e.stopPropagation();}}})),
-      h('label',null,h('input',{type:'checkbox',checked:sensitive,onChange:e=>{setSensitive(e.target.checked);setCurrent(0);}}),t('case')),
+    h('div',{className:'dbs-toolbar'},h('label',null,t('find'),h('input',{ref:input,type:'search',value:query,placeholder:t('placeholder'),disabled:loading||!!error,onChange:e=>changeQuery(e.target.value),onKeyDown:e=>{if(e.key==='Enter'&&!e.nativeEvent.isComposing){e.preventDefault();move(e.shiftKey?-1:1);}if(e.key==='Escape'){changeQuery('');e.stopPropagation();}}})),
+      h('label',null,h('input',{type:'checkbox',checked:sensitive,onChange:e=>changeQuery(query,e.target.checked)}),t('case')),
       button(t('clear'),()=>changeQuery(''),!query)),
     h('div',{className:'dbs-toolbar dbs-results'},
       h('output',{className:'dbs-match-counter','data-status':position.status,'aria-live':'polite','aria-atomic':'true'},counterText),
@@ -159,7 +232,7 @@ function Reader({content,resourceAddress,scrollportRef,isPdf,t}) {
         onCompositionStart:()=>{jumpComposing.current=true;},onCompositionEnd:()=>{jumpComposing.current=false;},
         onKeyDown:e=>{if(e.key==='Enter'&&!isComposingKey(e,jumpComposing.current)){e.preventDefault();e.stopPropagation();jump();}}
       })),button(t('jumpButton'),jump,position.status!=='matched'),
-      h('button',{type:'button','aria-expanded':listExpanded,'aria-controls':resultListId,disabled:position.status!=='matched'&&!listExpanded,onClick:()=>{if(!listExpanded)setListPage(Math.floor(Math.max(0,position.current-1)/RESULTS_PAGE_SIZE));setListExpanded(!listExpanded);}},t(listExpanded?'hideResults':'showResults')),
+      h('button',{type:'button','aria-expanded':listExpanded,'aria-controls':resultListId,disabled:position.status!=='matched'&&!listExpanded,onClick:toggleList},t(listExpanded?'hideResults':'showResults')),
       isPdf&&position.status==='matched'&&active&&h('span',{className:'dbs-match-page'},t('matchPage',{page:active.page})),
       jumpError&&h('span',{id:jumpErrorId,className:'dbs-jump-error',role:'alert'},t(jumpError,{total:position.total}))),
     listExpanded&&h('section',{id:resultListId,className:'dbs-result-panel','aria-label':t('resultsTitle')},
@@ -169,14 +242,16 @@ function Reader({content,resourceAddress,scrollportRef,isPdf,t}) {
         button(t('nextResults'),()=>setListPage(listing.page+1),listing.page+1>=listing.pageCount)),
         h(ResultList,{listing,current:position.current-1,t,onSelect:selectMatch})):
         h('p',{className:'dbs-note'},counterText)),
-    isPdf&&state.pages.length>0&&h('div',{className:'dbs-toolbar'},button('‹',()=>setPage(p=>Math.max(1,p-1)),page<=1),h('label',null,t('page'),h('input',{type:'number',min:1,max:state.pages.length,value:page,onChange:e=>{const n=Number(e.target.value);if(Number.isInteger(n)&&n>=1&&n<=state.pages.length)setPage(n);}})),h('span',null,' / '+state.pages.length),button('›',()=>setPage(p=>Math.min(state.pages.length,p+1)),page>=state.pages.length)),
+    isPdf&&pages.length>0&&h('div',{className:'dbs-toolbar'},button('‹',()=>changePage(Math.max(1,page-1)),page<=1),h('label',null,t('page'),h('input',{type:'number',min:1,max:pages.length,value:page,onChange:e=>{const n=Number(e.target.value);if(Number.isInteger(n)&&n>=1&&n<=pages.length)changePage(n);}})),h('span',null,' / '+pages.length),button('›',()=>changePage(Math.min(pages.length,page+1)),page>=pages.length)),
     h('p',{className:'dbs-note'},t(isPdf?'pdfNote':'mdNote')),
-    h('div',{className:'dbs-scroll',ref},
-      state.loading?h('p',{role:'status'},t('loading')):state.error?h('p',{role:'alert'},t('error')+' '+state.error):isPdf?
-        h(React.Fragment,null,!state.pages.some(p=>p.text.trim())&&h('p',{role:'status'},t('scanned')),h(PdfPage,{doc:state.doc,pageNumber:page,record:state.pages[page-1],matches:pageMatches,active:pageActive,reveal,t})):
-        h('pre',{className:'dbs-markdown'},marks(state.pages[0]?.text||'',results,position.current-1))));
+    h('div',{className:'dbs-scroll',ref,onScroll:captureScroll},
+      loading?h('p',{role:'status'},t('loading')):error?h('p',{role:'alert'},t('error')+' '+error):isPdf?
+        h(React.Fragment,null,!pages.some(p=>p.text.trim())&&h('p',{role:'status'},t('scanned')),pages.length>0&&h(PdfPage,{doc:state.doc,pageNumber:page,record:pages[page-1],matches:pageMatches,active:pageActive,intentRevision,onRenderStart:renderStarted,onReady:finishReady,t})):
+        h('pre',{className:'dbs-markdown'},marks(pages[0]?.text||'',results,position.current-1))));
 }
 module.exports={inject:['slots','documentPreviews','locale'],apply(ctx){
+  const viewCache=createViewStateCache();
+  ctx.effect(()=>()=>viewCache.dispose());
   ctx.effect(()=>{
     if(typeof workerSource !== 'string' || !workerSource.includes('WorkerMessageHandler')) throw new Error('Invalid bundled PDF worker source');
     const url=URL.createObjectURL(new Blob([workerSource],{type:'text/javascript'}));
@@ -188,6 +263,6 @@ module.exports={inject:['slots','documentPreviews','locale'],apply(ctx){
   const t=ctx.locale.bind('documentSearch');
   for(const [suffixes,isPdf,id,label] of [[['pdf'],true,ID+'/pdf','pdfTitle'],[['md','markdown','mdown'],false,ID+'/md','mdTitle']]){
     ctx.effect(()=>ctx.documentPreviews.register({id,extensions:suffixes,...(isPdf?{binaryExtensions:['pdf']}:{}),priority:'builtin',title:()=>t(label),loading:'bytes-complete',wrap:false}));
-    ctx.effect(()=>ctx.slots.inject('sidebar.right.tab.document',()=>ctx.slots.register({name:'sidebar.right.tab.document',key:id,locale:'documentSearch'},props=>h(Reader,{...props,isPdf}))));
+    ctx.effect(()=>ctx.slots.inject('sidebar.right.tab.document',()=>ctx.slots.register({name:'sidebar.right.tab.document',key:id,locale:'documentSearch'},props=>h(ReaderEntry,{...props,isPdf,viewCache}))));
   }
 }};
