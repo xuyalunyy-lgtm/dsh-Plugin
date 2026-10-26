@@ -32,7 +32,7 @@ pwsh -NoProfile -File "D:\xuyl\tool\DSH\dsh-desktop-quick-actions\Apply-Patch.ps
 4. 正常启动 Harness，打开 **应用 → 重启应用…**。
 5. 先测试取消；确认实际重启会中断任务，请自行选择合适时机。
 
-安装脚本发现本安装目录的程序仍在运行会拒绝操作，绝不结束进程。它会先核对原归档 SHA256，备份，校验候选内容，再用同目录临时文件原子替换。若自动更新已改变安装包，会拒绝覆盖。
+安装脚本 0.1.1 已修复 PowerShell 空参数导致的 `File.Replace: The path is empty`，并新增真实文件安装/回滚测试。安装脚本发现本安装目录的程序仍在运行会拒绝实际替换，绝不结束进程。它会先核对原归档 SHA256，备份，校验候选内容，再用同目录临时文件原子替换。若自动更新已改变安装包，会拒绝覆盖。
 
 ## 回滚
 
@@ -42,7 +42,7 @@ pwsh -NoProfile -File "D:\xuyl\tool\DSH\dsh-desktop-quick-actions\Apply-Patch.ps
 pwsh -NoProfile -File "D:\xuyl\tool\DSH\dsh-desktop-quick-actions\Apply-Patch.ps1" -Action Rollback
 ```
 
-原归档备份位于 `D:\deepseekH\resources\app.asar.safe-restart-04b32e3a8728.bak`，首次真正安装时才创建。回滚不删除备份。安装后出现启动问题时不要反复修改 EXE，直接回滚。
+原归档备份位于 `D:\deepseekH\resources\app.asar.safe-restart-04b32e3a8728.bak`，首次尝试实际安装、替换前创建。即使替换失败，正确的备份也会保留。若当前已是原版，Rollback 直接报告无需回滚，不要求备份存在；若当前确为补丁版但备份缺失，则明确拒绝而不修改安装。回滚不删除备份。安装后出现启动问题时不要反复修改 EXE，直接回滚。
 
 ## 重新生成与测试
 
