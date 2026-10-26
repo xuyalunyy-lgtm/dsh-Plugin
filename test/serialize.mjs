@@ -50,3 +50,59 @@ test('normalizes forbidden call ID characters deterministically', () => {
   assert.equal(normalized.length, 64);
   assert.match(normalized, /^[a-zA-Z0-9_-]+$/);
 });
+
+test('maps harness tool messages to function_call_output', () => {
+  const messages = [
+    { role: 'assistant', content: [{ type: 'tool-call', id: 'call_1', name: 'pwsh', arguments: '{}' }] },
+    { role: 'tool', toolCallId: 'call_1', content: [{ type: 'text', text: 'hi' }] },
+  ];
+  const input = serializeMessages(messages, []);
+  assert.deepEqual(input[0], { type: 'function_call', call_id: 'call_1', name: 'pwsh', arguments: '{}' });
+  assert.deepEqual(input[1], { type: 'function_call_output', call_id: 'call_1', output: 'hi' });
+});
+
+test('keeps an empty tool output representable', () => {
+  const input = serializeMessages([{ role: 'tool', toolCallId: 'call_2', content: [] }], []);
+  assert.equal(input[0].output, '(no output)');
+});
+
+test('serializes image blocks with resolved data URLs', () => {
+  const images = new Map([['att_1', 'data:image/png;base64,AAAA']]);
+  const input = serializeMessages(
+    [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'look' },
+          { type: 'image', attachment: { attachmentId: 'att_1', mediaType: 'image/png' } },
+        ],
+      },
+    ],
+    [],
+    images,
+  );
+  assert.deepEqual(input[0].content, [
+    { type: 'input_text', text: 'look' },
+    { type: 'input_image', image_url: 'data:image/png;base64,AAAA' },
+  ]);
+});
+
+test('refuses to drop an unresolved image silently', () => {
+  const messages = [
+    { role: 'user', content: [{ type: 'image', attachment: { attachmentId: 'att_x', mediaType: 'image/png' } }] },
+  ];
+  assert.throws(() => serializeMessages(messages, []), /图片附件缺少请求字节/);
+});
+
+test('collects system messages into instructions instead of input', () => {
+  const systemParts = [];
+  const input = serializeMessages(
+    [
+      { role: 'system', content: [{ type: 'text', text: 'be brief' }] },
+      { role: 'user', content: [{ type: 'text', text: 'hi' }] },
+    ],
+    systemParts,
+  );
+  assert.equal(input.length, 1);
+  assert.deepEqual(systemParts, ['be brief']);
+});

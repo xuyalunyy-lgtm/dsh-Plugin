@@ -39,8 +39,8 @@
     }
   },
   "dependencies": {
-    "@deepseek-ai/dsh-llm": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-timeout": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-llm": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-timeout": "0.2.1-rc.3",
     "@deepseek-ai/schemastery": "^3.18.4",
     "eventsource-parser": "^3.1.1",
     "https-proxy-agent": "^7.0.6",

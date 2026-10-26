@@ -48,6 +48,10 @@ assert.deepEqual(config.staticModels.get(), []); // 未配置 → 空数组快�
 // ④ 模拟 0.2.0 宿主的两处注册校验
 const observed = { directory: undefined, adapter: undefined };
 const ctx = {
+  get(name) {
+    assert.equal(name, 'attachments');
+    return undefined; // 纯文本宿主允许不提供附件服务。
+  },
   logger: { error: (...args) => console.error(...args) },
   fiber: { entry: { options: { id: 'llm-codex' } } },
   llm: {

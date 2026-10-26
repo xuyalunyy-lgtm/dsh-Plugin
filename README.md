@@ -61,6 +61,11 @@ Codex CLI(`codex login`)会把 ChatGPT 订阅的 OAuth 令牌写入 `~/.codex/au
   `~/.codex/models_cache.json`,再回退内置静态列表。
 - **协议**:OpenAI Responses API(`stream: true` SSE),推理摘要、正文、工具调用分别映射为
   DSH 的 reasoning / text / tool-call 块,usage 从 `response.completed` 提取。
+- **工具历史配对**:DSH 的工具结果消息是 `role: 'tool'` + `toolCallId`,序列化时映射为与
+  `function_call` 配对的 `function_call_output`;漏掉会让后端以
+  "No tool output found for function call"(400)拒绝整轮请求。
+- **多模态**:用户上传的图片按附件 id 读取,编码成 `input_image` + `data:` URL 发送;
+  目录里 `input_modalities` 含 `image` 的模型(2026-10 目录 9 个模型全部支持)可直接看图。
 
 ## 目录结构
 
@@ -69,7 +74,7 @@ lib/
   index.js      插件入口(注册 provider "codex" + 目录条目 + volatile Config)
   adapter.js    CodexAdapter:fetch + SSE → StreamChunk(含 60s 模型目录缓存)
   auth.js       auth.json 读取 / 订阅令牌刷新 / 原子写回
-  serialize.js  harness 消息 → Responses API 请求体
+  serialize.js  harness 消息 → Responses API 请求体(工具结果配对 + 图片 data URL)
   translate.js  Responses SSE 事件 → StreamChunk
   sse.js        SSE 字节流解析(Responses 协议无 [DONE])
   models.js     模型目录:实时发现 → models_cache.json → 静态兜底
@@ -215,5 +220,6 @@ npm run test:probe                    # client_version 门控探针 + 最小流�
 
 - 本插件会读取并(在刷新时)改写 `~/.codex/auth.json`,与 codex CLI 行为一致;如不希望
   写回,设置 `writeBack: false`(届时过期令牌只在内存中刷新,重启 dsh 后重新刷新)。
-- 适配器为文本 only:图片内容会以 `UNSUPPORTED_CONTENT` 拒绝。
+- 支持图片输入(多模态):图片按附件 id 从 DSH 附件服务读取,编码成 `input_image` 的
+  `data:` URL;宿主未提供附件服务时,含图片的请求会显式报 `UNSUPPORTED_CONTENT`。
 - 订阅额度由 OpenAI 按账号计量,与 codex CLI 共用同一配额。
