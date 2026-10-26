@@ -39,6 +39,8 @@ window.__ModuleLoader__.load({
     });
     Object.assign(zh,{pendingWrite:'保存结果待确认：只能重试原请求，不能修改其内容。',retryOriginal:'重试原请求 / 确认结果',pendingWrites:'待确认的任务操作',journalUnavailable:'无法保存请求凭证，操作未发送。请允许此标签页存储后重试。',journalFull:'待确认请求已达256条，请先处理现有请求。',writeExpired:'此请求已超过7天防重复保留期，不能自动重试。请先核对任务列表。',releaseChecked:'我已核对列表，了解原操作可能已成功，解除此请求锁。',releaseRequest:'确认解除请求锁',conflictDraft:'原任务已改变或草稿缺少版本信息。不会覆盖他人修改；本地草稿已保留。',reloadOriginal:'用最新任务替换草稿',reloadConfirm:'确认丢弃本地修改并加载最新任务',copyNew:'另存为新待办',newerUnsaved:'原请求已确认，但较新的草稿修改尚未保存，请核对后再次保存。',confirmedSave:'已确认原请求保存成功',writePolicy:'任务写入防重复回执保留7天（最多4096条）。凭证仅在当前标签页保存；关闭标签页、换设备或超过保留期前请确认结果。',writeFailed:'保存失败，草稿保留；请检查提示后重试。'});
     Object.assign(en,{pendingWrite:'Save result unknown. Retry only the original request; its content is locked.',retryOriginal:'Retry original / confirm result',pendingWrites:'Unconfirmed task operations',journalUnavailable:'Could not persist the request receipt. Nothing was sent. Allow tab storage and retry.',journalFull:'256 pending requests reached. Resolve existing requests first.',writeExpired:'The 7-day deduplication window has elapsed. Automatic retry is blocked. Check your task list first.',releaseChecked:'I checked the task list and understand the original operation may have succeeded. Release this request lock.',releaseRequest:'Confirm releasing request lock',conflictDraft:'The original task changed or this draft has no baseline. Your draft is preserved; other edits will not be overwritten.',reloadOriginal:'Replace draft with latest task',reloadConfirm:'Discard local edits and load latest task',copyNew:'Save as a new task',newerUnsaved:'The original request is confirmed, but newer draft changes are not saved. Review and save again.',confirmedSave:'Original save confirmed',writePolicy:'Successful write receipts last 7 days (maximum 4096). Pending requests are stored in this tab only. Confirm results before closing the tab, changing devices or expiry.',writeFailed:'Save failed. Your draft is preserved; review the error before retrying.'});
+    Object.assign(zh,{overdueTitle:'历史未完成',overdueHint:'汇总今天以前尚未完成的任务。不会自动改期，点击后才移到今天；保留原时间与专注统计。',overdueEmpty:'没有历史未完成任务。',moveToday:'移到今天',viewOriginalDay:'查看原日期',showMore:'再显示 20 条',overdueNotEligible:'该任务已不属于历史未完成，或缺少编辑版本，请刷新后核对。'});
+    Object.assign(en,{overdueTitle:'Earlier unfinished tasks',overdueHint:'Unfinished tasks scheduled before today. Nothing moves automatically. Moving keeps the original time and focus statistics.',overdueEmpty:'No unfinished tasks from earlier days.',moveToday:'Move to today',viewOriginalDay:'View original day',showMore:'Show 20 more',overdueNotEligible:'This task is no longer eligible or has no edit version. Refresh and review it.'});
     const css = `
 .fc{height:100%;overflow:auto;box-sizing:border-box;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-base);font-family:inherit;font-size:14px;line-height:1.5;padding:20px clamp(12px,2.5vw,32px)}
 .fc *,.fc-toast *{box-sizing:border-box}.fc-wrap{max-width:1120px;margin:auto}.fc-head,.fc-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.fc-head{justify-content:space-between;margin-bottom:16px}.fc h1{font-size:24px;font-weight:650;margin:0 0 3px}.fc h2{font-size:16px;font-weight:600;margin:0}.fc p{margin:7px 0 12px}.fc-muted{color:var(--dsw-alias-label-secondary);font-size:12px}.fc-grid{display:grid;grid-template-columns:minmax(300px,1.45fr) minmax(240px,1fr);gap:16px;align-items:start}.fc-stack{display:grid;gap:16px;min-width:0}.fc-card{padding:16px;border:1px solid var(--dsw-alias-border-l1);border-radius:14px;background:var(--dsw-alias-bg-layer-1);min-width:0}
@@ -73,6 +75,15 @@ window.__ModuleLoader__.load({
     function selectTasks(tasks, date, filter='all') {
       return tasks.filter(task => task.date === date && (filter === 'all' || (filter === 'done' ? task.done : !task.done)))
         .sort((a,b) => Number(a.done)-Number(b.done) || (a.time || '99:99').localeCompare(b.time || '99:99'));
+    }
+    function selectOverdueTasks(tasks,today) {
+      if(!localDate(today))return [];
+      return tasks.filter(task=>!task.done&&localDate(task.date)&&task.date<today)
+        .sort((a,b)=>a.date.localeCompare(b.date)||(a.time||'99:99').localeCompare(b.time||'99:99'));
+    }
+    function overdueMoveRequest(task,today) {
+      if(!localDate(today)||!task||task.done||!localDate(task.date)||task.date>=today||!hasEditToken(task.editToken))return null;
+      return {id:task.id,date:today,expectedToken:task.editToken};
     }
     function dayStats(tasks) {
       const result = Object.create(null);
@@ -384,6 +395,36 @@ window.__ModuleLoader__.load({
             button('recoveryPreview',recoveryPreview,{disabled:locked||busy}),h('p',{className:'fc-muted'},t('recoveryHint'))):h('p',{className:'fc-muted'},t('recoveryMissing'))),
           locked&&h('p',{role:'status',className:'fc-muted'},t('saving')),localError&&h('p',{role:'alert',className:'fc-error'},localError),message&&h('p',{role:'status',className:'fc-muted'},message));
       }
+      function OverduePanel({onChooseDate}){
+        const {state:s,busy,clock}=useStore();
+        React.useSyncExternalStore(journal.subscribe,journal.getSnapshot);
+        const [limit,setLimit]=React.useState(20),[message,setMessage]=React.useState(null),[failure,setFailure]=React.useState('');
+        const lock=React.useRef(false),mounted=React.useRef(false);
+        React.useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
+        const today=dayKey(new Date(clock));
+        const items=React.useMemo(()=>selectOverdueTasks(s?.tasks||[],today),[s?.tasks,today]);
+        const move=async item=>{
+          if(lock.current||busy)return;
+          const request=overdueMoveRequest(item,dayKey(new Date()));
+          if(!request){setFailure(t('overdueNotEligible'));return;}
+          lock.current=true;setFailure('');setMessage(null);
+          try{
+            // Reuse the guarded operation: frozen token + durable request ID, no new write path.
+            const result=await taskWrite('update',request);
+            if(!mounted.current)return;
+            if(result.ok)setMessage({title:item.title,date:request.date});else setFailure(result.error);
+          }finally{lock.current=false;}
+        };
+        return h('details',{className:'fc-card'},h('summary',null,t('overdueTitle'),' · ',items.length),
+          h('p',{className:'fc-muted'},t('overdueHint')),
+          items.length?items.slice(0,limit).map(item=>h('div',{className:'fc-task',key:item.id},
+            h('div',{className:'fc-task-text'},h('strong',null,item.title),h('div',{className:'fc-muted'},item.date,' · ',item.time||t('allDay'))),
+            h('div',{className:'fc-task-actions'},button('viewOriginalDay',()=>onChooseDate(item.date),{className:'fc-small'}),
+              button('moveToday',()=>move(item),{className:'fc-small',disabled:busy||!!journal.get('row:'+item.id)||!hasEditToken(item.editToken)})))):h('p',{className:'fc-muted'},t('overdueEmpty')),
+          items.length>limit&&button('showMore',()=>setLimit(n=>n+20),{className:'fc-small'}),
+          message&&h('div',{className:'fc-notice',role:'status'},h('span',{className:'fc-notice-text'},message.title,' · ',t('moved'),' ',message.date),button('showDate',()=>onChooseDate(message.date),{className:'fc-small'}),button('dismiss',()=>setMessage(null),{className:'fc-small'})),
+          failure&&h('div',{className:'fc-notice fc-error',role:'alert'},h('span',{className:'fc-notice-text'},failure),button('dismiss',()=>setFailure(''),{className:'fc-small'})));
+      }
       function TrashPanel(){
         const {state:s,busy,clock}=useStore();const [confirm,setConfirm]=React.useState(null),[message,setMessage]=React.useState(''),[failure,setFailure]=React.useState('');const lock=React.useRef(false),mounted=React.useRef(false);
         React.useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
@@ -503,6 +544,7 @@ window.__ModuleLoader__.load({
                 h('div',{className:'fc-calendar'},...t('weekdays').split(' ').map(w=>h('span',{className:'fc-week',key:w},w)),...cells),
                 h('div',{className:'fc-row fc-datebar'},button('prevDay',()=>chooseDate(shiftDate(date,-1)),{className:'fc-small',disabled:shiftDate(date,-1)===date}),h('input',{type:'date','aria-label':t('selectedDate'),value:date,min:'0001-01-01',max:'9999-12-31',onChange:e=>chooseDate(e.target.value)}),button('nextDay',()=>chooseDate(shiftDate(date,1)),{className:'fc-small',disabled:shiftDate(date,1)===date})),
                 h('p',{className:'fc-muted',style:{marginBottom:0}},t('legend'))),
+              h(OverduePanel,{onChooseDate:chooseDate}),
               h('section',{className:'fc-card'},
                 h('div',{className:'fc-head',style:{marginBottom:6}},h('div',null,h('h2',null,t('tasks')),h('div',{className:'fc-muted'},date,' · ',chosen.toLocaleDateString(ctx.locale.getLocale().active,{weekday:'long'}))),button('newTask',()=>exitEdit(),{className:'fc-small'})),
                 h('div',{className:'fc-row fc-muted'},`${day.done} / ${day.total} ${t('completed')}`),h('progress',{className:'fc-progress',value:day.done,max:Math.max(1,day.total),'aria-label':t('dateProgress')}),
