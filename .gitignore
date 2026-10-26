@@ -1,0 +1,5 @@
+node_modules/
+baseline/
+staging/
+backups/
+*.log
