@@ -41,7 +41,8 @@ test('date-only updates move tasks across month, year and leap-day boundaries wi
       original = step(original, { action: 'update', id: taskId, done });
       const before = structuredClone(original);
       const moved = step(original, { action: 'update', id: taskId, date: to });
-      assert.deepEqual(moved.tasks, [{ ...before.tasks[0], date: to }], `${from} -> ${to}, done=${done}`);
+      assert.notEqual(moved.tasks[0]._editVersion,before.tasks[0]._editVersion,'editable move must invalidate old baselines');
+      assert.deepEqual(moved.tasks, [{ ...before.tasks[0], date: to, _editVersion:moved.tasks[0]._editVersion }], `${from} -> ${to}, done=${done}`);
       assert.deepEqual(original, before, 'moving must not mutate the caller-owned state');
       assert.deepEqual({ ...moved, tasks: [] }, { ...before, tasks: [] }, 'unrelated state must survive');
     }
@@ -62,7 +63,8 @@ test('moving a task preserves all existing source and destination tasks, even wi
   original = step(original, { action: 'update', id: taskId, done: true });
   const before = structuredClone(original);
   const moved = step(original, { action: 'update', id: taskId, date: destination });
-  assert.deepEqual(moved.tasks, before.tasks.map(task => task.id === taskId ? { ...task, date: destination } : task));
+  assert.notEqual(moved.tasks[1]._editVersion,before.tasks[1]._editVersion);
+  assert.deepEqual(moved.tasks, before.tasks.map(task => task.id === taskId ? { ...task, date: destination, _editVersion:moved.tasks[1]._editVersion } : task));
   assert.deepEqual(moved.tasks.filter(task => task.date === source), before.tasks.filter(task => task.date === source && task.id !== taskId));
   assert.equal(moved.tasks.filter(task => task.date === destination).length, 3);
   assert.equal(new Set(moved.tasks.map(task => task.id)).size, before.tasks.length);
@@ -152,7 +154,7 @@ test('serialized commits prevent lost updates and failed saves leave durable sta
   assert.equal(writes, 20);
   fail = true;
   const result = await controller.dispatch({ action: 'delete', id: stored.tasks[0].id });
-  assert.deepEqual(result, { ok: false, error: 'disk full' });
+  assert.deepEqual(result, { ok: false, error: 'disk full', code:'WRITE_UNCERTAIN' });
   assert.equal(stored.tasks.length, 20);
   results[0].state.tasks[0].title = 'external mutation';
   assert.equal(stored.tasks[0].title, 'Task 0');

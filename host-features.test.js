@@ -21,7 +21,7 @@ test('v1.1 state migrates in the same domain shape without dropping task identit
   const legacy={tasks:[{id:'legacy',date:'2026-10-23',title:'  Preserved title  ',time:'',done:true}],settings:{focusMinutes:45,eyeMinutes:30,bodyMinutes:45,breakMinutes:5},focus:{status:'running',kind:'focus',endsAt:BASE+1234,remainingMs:1234},reminders:{eye:{running:false,nextAt:null},body:{running:false,nextAt:null}},alerts:[]};
   const parsed=stateSchema(z).parse(legacy);
   assert.equal(parsed.tasks[0].title,legacy.tasks[0].title);assert.equal(parsed.tasks[0].id,'legacy');assert.equal(parsed.tasks[0].focusMs,0);assert.equal(parsed.focus.endsAt,BASE+1234);assert.equal(parsed.focus.taskId,null);assert.deepEqual(parsed.trash,[]);assert.equal(parsed.recovery,null);
-  const r=rig(legacy);const result=await okay(r,{action:'read'});assert.equal(result.state.tasks[0].title,legacy.tasks[0].title);assert.deepEqual(r.state,normalizeState(legacy));await r.close();
+  const r=rig(legacy);const result=await okay(r,{action:'read'});assert.equal(result.state.tasks[0].title,legacy.tasks[0].title);const expected=normalizeState(legacy);assert.equal(typeof r.state.tasks[0]._editVersion,'string');expected.tasks[0]._editVersion=r.state.tasks[0]._editVersion;assert.deepEqual(r.state,expected);const stable=result.state.tasks[0].editToken;assert.equal((await okay(r,{action:'read'})).state.tasks[0].editToken,stable);await r.close();
 });
 
 test('focus segments count real running time only, cap on deadline, and count exactly one round without auto-done',async()=>{

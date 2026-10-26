@@ -37,6 +37,8 @@ window.__ModuleLoader__.load({
       trashTitle:'Trash', trashEmpty:'Trash is empty.', trashHint:'Deleted tasks are retained for 30 days, then expire automatically. Import does not extend the original retention period; expired records are filtered out. Restore uses the original task data.', deletedAt:'Deleted', retention:'Retention days remaining', restore:'Restore task', restored:'Restored to', undoDelete:'Undo deletion', purge:'Delete permanently', purgeConfirm:'Confirm permanent deletion', purgeWarning:'Permanent deletion cannot be undone.', purged:'Permanently deleted',
       focusTask:'Focus on task', currentTask:'Current focus task', unlinkedFocus:'No task linked', focusTotal:'Total focus', focusRounds:'Completed rounds', focusSegment:'Current segment', continueFocus:'Continue focusing', finishTask:'Mark task complete', focusUnavailable:'Finish or reset the current timer first. Completed tasks cannot start focus.', taskUnavailable:'The linked task is missing or complete.', snooze5:'Snooze 5 min', snooze10:'Snooze 10 min', snoozedTitle:'Snoozed reminders', snoozedHint:'No repeat notification while snoozed. It will reappear when due.', noRange:'No dates',
     });
+    Object.assign(zh,{pendingWrite:'保存结果待确认：只能重试原请求，不能修改其内容。',retryOriginal:'重试原请求 / 确认结果',pendingWrites:'待确认的任务操作',journalUnavailable:'无法保存请求凭证，操作未发送。请允许此标签页存储后重试。',journalFull:'待确认请求已达256条，请先处理现有请求。',writeExpired:'此请求已超过7天防重复保留期，不能自动重试。请先核对任务列表。',releaseChecked:'我已核对列表，了解原操作可能已成功，解除此请求锁。',releaseRequest:'确认解除请求锁',conflictDraft:'原任务已改变或草稿缺少版本信息。不会覆盖他人修改；本地草稿已保留。',reloadOriginal:'用最新任务替换草稿',reloadConfirm:'确认丢弃本地修改并加载最新任务',copyNew:'另存为新待办',newerUnsaved:'原请求已确认，但较新的草稿修改尚未保存，请核对后再次保存。',confirmedSave:'已确认原请求保存成功',writePolicy:'任务写入防重复回执保留7天（最多4096条）。凭证仅在当前标签页保存；关闭标签页、换设备或超过保留期前请确认结果。',writeFailed:'保存失败，草稿保留；请检查提示后重试。'});
+    Object.assign(en,{pendingWrite:'Save result unknown. Retry only the original request; its content is locked.',retryOriginal:'Retry original / confirm result',pendingWrites:'Unconfirmed task operations',journalUnavailable:'Could not persist the request receipt. Nothing was sent. Allow tab storage and retry.',journalFull:'256 pending requests reached. Resolve existing requests first.',writeExpired:'The 7-day deduplication window has elapsed. Automatic retry is blocked. Check your task list first.',releaseChecked:'I checked the task list and understand the original operation may have succeeded. Release this request lock.',releaseRequest:'Confirm releasing request lock',conflictDraft:'The original task changed or this draft has no baseline. Your draft is preserved; other edits will not be overwritten.',reloadOriginal:'Replace draft with latest task',reloadConfirm:'Discard local edits and load latest task',copyNew:'Save as a new task',newerUnsaved:'The original request is confirmed, but newer draft changes are not saved. Review and save again.',confirmedSave:'Original save confirmed',writePolicy:'Successful write receipts last 7 days (maximum 4096). Pending requests are stored in this tab only. Confirm results before closing the tab, changing devices or expiry.',writeFailed:'Save failed. Your draft is preserved; review the error before retrying.'});
     const css = `
 .fc{height:100%;overflow:auto;box-sizing:border-box;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-base);font-family:inherit;font-size:14px;line-height:1.5;padding:20px clamp(12px,2.5vw,32px)}
 .fc *,.fc-toast *{box-sizing:border-box}.fc-wrap{max-width:1120px;margin:auto}.fc-head,.fc-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.fc-head{justify-content:space-between;margin-bottom:16px}.fc h1{font-size:24px;font-weight:650;margin:0 0 3px}.fc h2{font-size:16px;font-weight:600;margin:0}.fc p{margin:7px 0 12px}.fc-muted{color:var(--dsw-alias-label-secondary);font-size:12px}.fc-grid{display:grid;grid-template-columns:minmax(300px,1.45fr) minmax(240px,1fr);gap:16px;align-items:start}.fc-stack{display:grid;gap:16px;min-width:0}.fc-card{padding:16px;border:1px solid var(--dsw-alias-border-l1);border-radius:14px;background:var(--dsw-alias-bg-layer-1);min-width:0}
@@ -116,7 +118,69 @@ window.__ModuleLoader__.load({
         set(key,value){if (!validDraft(value)) return false;drafts[key]={...value};persist();return true;},
         drop(key){delete drafts[key];persist();},
         clearIfUnchanged(key,sent){if (!sameDraft(drafts[key],sent)) return false;delete drafts[key];persist();return true;},
+        atomicSettlement(mutate){
+          // Unlike best-effort typing drafts, successful write settlement must be durable.
+          // Stage every draft/view change together; publish only after setItem succeeds.
+          const nextDrafts=JSON.parse(JSON.stringify(drafts));let nextView={...view};
+          const staged={
+            get:(key,fallback)=>({...((nextDrafts[key])||fallback)}),has:key=>Object.hasOwn(nextDrafts,key),
+            set(key,value){if(!validDraft(value))throw Error('draftSettlementFailed');nextDrafts[key]={...value};},
+            drop(key){delete nextDrafts[key];},getView:()=>({...nextView}),setView(patch){nextView={...nextView,...patch};},
+            clearIfUnchanged(key,sent){if(!sameDraft(nextDrafts[key],sent))return false;delete nextDrafts[key];return true;},
+          };
+          const result=mutate(staged);
+          try{if(!storage)throw Error('No storage');storage.setItem(storageKey,JSON.stringify({version:1,view:nextView,drafts:nextDrafts}));}
+          catch{persistent=false;revision++;watchers.forEach(fn=>fn());throw Error('draftSettlementFailed');}
+          drafts=nextDrafts;view=nextView;persistent=true;revision++;watchers.forEach(fn=>fn());return result;
+        },
       };
+    }
+    const WRITE_TTL=7*86400000;
+    const taskWriteActions=['add','update','delete','restore','trashPurge'];
+    const cloneJson=value=>JSON.parse(JSON.stringify(value));
+    const hasEditToken=token=>typeof token==='string'&&/^[a-f0-9]{64}$/.test(token);
+    function createWriteJournal(storage){
+      const storageKey='dsh-focus-calendar.writes.v1';
+      let entries=Object.create(null),revision=0,usable=!!storage;
+      const listeners=new Set();
+      const validRecord=record=>record&&typeof record.key==='string'&&record.key.length<=256&&Number.isSafeInteger(record.createdAt)&&record.createdAt>=0&&record.payload&&taskWriteActions.includes(record.payload.action)&&typeof record.payload.requestId==='string'&&record.payload.requestId.length>=16&&record.payload.requestId.length<=128;
+      try{const raw=storage?.getItem(storageKey);if(raw){const saved=JSON.parse(raw);if(saved.version!==1||!Array.isArray(saved.entries)||saved.entries.length>256||!saved.entries.every(validRecord))throw Error('invalid journal');for(const record of saved.entries){if(entries[record.key])throw Error('duplicate journal key');entries[record.key]=record;}}}catch{usable=false;}
+      const persist=next=>{
+        if(!usable)throw Error('journalUnavailable');
+        try{storage.setItem(storageKey,JSON.stringify({version:1,entries:Object.values(next)}));}catch{throw Error('journalUnavailable');}
+        entries=next;revision++;listeners.forEach(fn=>fn());
+      };
+      return {
+        subscribe(fn){listeners.add(fn);return()=>listeners.delete(fn);},getSnapshot:()=>revision,
+        list:()=>cloneJson(Object.values(entries)),get:key=>entries[key]?cloneJson(entries[key]):null,
+        begin(key,payload,now,requestId,draft){
+          if(entries[key])throw Error('pendingWrite');
+          if(Object.keys(entries).length>=256)throw Error('journalFull');
+          const record={key,createdAt:now,payload:{...cloneJson(payload),requestId},...(draft?{draft:cloneJson(draft)}:{})};
+          if(!validRecord(record))throw Error('journalUnavailable');persist({...entries,[key]:record});return cloneJson(record);
+        },
+        remove(key,requestId){if(entries[key]?.payload.requestId!==requestId)return false;const next={...entries};delete next[key];persist(next);return true;},
+      };
+    }
+    function settleEditorReceipt(drafts,record,receipt){
+      if(!record.key.startsWith('editor:')||!record.draft)return {cleared:false,newer:false};
+      if(drafts.atomicSettlement)return drafts.atomicSettlement(staged=>settleEditorReceipt(staged,record,receipt));
+      const key=record.key.slice(7),current=drafts.get(key);
+      // A crash may leave a durable cleared draft plus an unremoved request journal.
+      if(!drafts.has(key))return {cleared:true,newer:false};
+      if(sameDraft(current,record.draft)){
+        drafts.clearIfUnchanged(key,current);
+        const view=drafts.getView();
+        if(key==='new:'+view.date&&!view.editing)drafts.setView({filter:'all'});
+        return {cleared:true,newer:false};
+      }
+      // Never discard text changed while an old network result was unresolved.
+      if(record.payload.action==='update')drafts.set(key,{...current,expectedToken:receipt.taskToken});
+      else if(record.payload.action==='add'&&receipt.taskId&&!drafts.has('edit:'+receipt.taskId)){
+        drafts.set('edit:'+receipt.taskId,{...current,expectedToken:receipt.taskToken});drafts.drop(key);
+        const view=drafts.getView();if(key==='new:'+view.date&&!view.editing)drafts.setView({editing:receipt.taskId});
+      }
+      return {cleared:false,newer:true};
     }
     const BACKUP_MAX_BYTES=4*1024*1024;
     function backupShape(value){return !!value&&typeof value==='object'&&!Array.isArray(value)&&value.format==='dsh-focus-calendar'&&value.version===1&&Number.isFinite(value.exportedAt)&&Array.isArray(value.tasks)&&Array.isArray(value.trash)&&!!value.settings&&typeof value.settings==='object'&&!Array.isArray(value.settings);}
@@ -148,6 +212,7 @@ window.__ModuleLoader__.load({
       const t=ctx.locale.bind('focus-calendar');
       let storage;try {storage=window.sessionStorage;} catch { /* Memory-only drafts remain usable. */ }
       const drafts=createDraftStore(storage,dayKey(new Date()));
+      const journal=createWriteJournal(storage),writeLocks=new Set();
       const pendingDrafts=new Set();
       let snapshot={state:null,error:'',syncError:'',busy:false,clock:Date.now(),serverOffset:0,revision:0};
       const listeners=new Set(),abort=new AbortController();
@@ -170,7 +235,8 @@ window.__ModuleLoader__.load({
       async function requestFull(input){
         const response=await fetch('/focus-calendar/api',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(input),signal:abort.signal});
         if(!response.ok)throw Error(`HTTP ${response.status}`);
-        const result=await response.json();if(!result.ok)throw Error(result.error||t('error'));
+        const result=await response.json();
+        if(!result.ok){publish(input.action==='read'?{syncError:result.error||t('error')}:{error:result.error||t('error')});return result;}
         publish({state:result.state,...(input.action==='read'?{syncError:''}:{error:''}),clock:Date.now(),serverOffset:result.state.now-Date.now()});
         if(!dead)notify(result.state);return result;
       }
@@ -181,15 +247,60 @@ window.__ModuleLoader__.load({
         const run=queue.then(async()=>{
           if(mutating)publish({busy:true,error:''});
           try{return await requestFull({action,...args});}
-          catch(e){publish(mutating?{error:e.message}:{syncError:e.message});return {ok:false,error:e.message};}
+          catch(e){publish(mutating?{error:e.message}:{syncError:e.message});return {ok:false,error:e.message,code:'NETWORK_UNCERTAIN'};}
           finally{if(mutating)publish({busy:false});}
         });
         queue=run.catch(()=>{});return run;
       }
       async function act(action,args={}) {const result=await actFull(action,args);return result.ok?result.state:null;}
+      async function retryWrite(record){
+        if(writeLocks.has(record.key))return {ok:false,code:'PENDING_EXISTS',error:t('pendingWrite')};
+        if(Date.now()-record.createdAt>=WRITE_TTL)return {ok:false,code:'REQUEST_EXPIRED',error:t('writeExpired')};
+        writeLocks.add(record.key);publish({});
+        try{
+          const {action,...args}=record.payload;
+          const result=await actFull(action,args);
+          if(!result.ok){
+            if(['CONFLICT','INVALID_REQUEST','RECEIPT_CAPACITY'].includes(result.code)){
+              journal.remove(record.key,record.payload.requestId);
+              if(result.code==='CONFLICT')await act('read');
+            }
+            return result;
+          }
+          if(result.receipt?.requestId!==record.payload.requestId)return {ok:false,code:'NETWORK_UNCERTAIN',error:t('pendingWrite')};
+          // Persist the complete draft/view settlement before removing the request ID.
+          // Either failure leaves the same request recoverable across a page reload.
+          const draftResult=settleEditorReceipt(drafts,record,result.receipt);
+          journal.remove(record.key,record.payload.requestId);
+          return {...result,draftResult};
+        }catch(e){return {ok:false,code:'NETWORK_UNCERTAIN',error:t(e.message==='journalUnavailable'?'journalUnavailable':'pendingWrite')};}
+        finally{writeLocks.delete(record.key);publish({});}
+      }
+      async function taskWrite(action,args,key='row:'+args.id,draft){
+        try{
+          if(action!=='add'&&!hasEditToken(args.expectedToken))return {ok:false,code:'CONFLICT',error:t('conflictDraft')};
+          const record=journal.begin(key,{action,...args},Date.now(),'fc-'+crypto.randomUUID(),draft);
+          const result=await retryWrite(record);if(!result.ok)publish({error:result.error});return result;
+        }catch(e){const result={ok:false,code:'LOCAL_WRITE_BLOCKED',error:t(e.message)};publish({error:result.error});return result;}
+      }
       const useStore=()=>{React.useSyncExternalStore(f=>ctx.locale.subscribe(f),()=>ctx.locale.getSnapshot());return React.useSyncExternalStore(subscribe,()=>snapshot);};
       const button=(key,fn,props={})=>h('button',{type:'button',onClick:fn,...props},t(key));
 
+      function PendingWrites(){
+        const {busy}=useStore();React.useSyncExternalStore(journal.subscribe,journal.getSnapshot);
+        const [checked,setChecked]=React.useState(null),[message,setMessage]=React.useState('');
+        const mounted=React.useRef(false);React.useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
+        const entries=journal.list();
+        const retry=async record=>{const result=await retryWrite(record);if(result.ok&&result.draftResult?.cleared&&record.key.startsWith('editor:edit:')&&drafts.getView().editing===record.key.slice(12))drafts.setView({editing:null,filter:'all'});if(mounted.current)setMessage(result.ok?t(result.draftResult?.newer?'newerUnsaved':'confirmedSave'):result.error);};
+        return h('details',{className:'fc-card',open:entries.length>0},h('summary',null,t('pendingWrites'),' · ',entries.length),
+          h('p',{className:'fc-muted'},t('writePolicy')),...entries.map(record=>{
+            const expired=Date.now()-record.createdAt>=WRITE_TTL;
+            return h('div',{className:'fc-trash-row',key:record.payload.requestId},h('strong',null,record.draft?.title||record.payload.title||record.payload.id||record.payload.action),h('p',{className:'fc-muted'},record.payload.action,' · ',t(expired?'writeExpired':'pendingWrite')),
+              !expired?button('retryOriginal',()=>retry(record),{disabled:busy||writeLocks.has(record.key)}):h(React.Fragment,null,
+                h('label',{className:'fc-confirm'},h('input',{type:'checkbox',checked:checked===record.payload.requestId,onChange:e=>setChecked(e.target.checked?record.payload.requestId:null)}),t('releaseChecked')),
+                button('releaseRequest',()=>{try{journal.remove(record.key,record.payload.requestId);setChecked(null);}catch{setMessage(t('journalUnavailable'));}},{disabled:checked!==record.payload.requestId||busy})));
+          }),message&&h('p',{role:'status'},message));
+      }
       function BackupPanel(){
         const {state:s,busy}=useStore();
         const [backup,setBackup]=React.useState(null),[preview,setPreview]=React.useState(null),[mode,setMode]=React.useState('merge');
@@ -276,69 +387,74 @@ window.__ModuleLoader__.load({
       function TrashPanel(){
         const {state:s,busy,clock}=useStore();const [confirm,setConfirm]=React.useState(null),[message,setMessage]=React.useState(''),[failure,setFailure]=React.useState('');const lock=React.useRef(false),mounted=React.useRef(false);
         React.useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
-        const run=async(action,item)=>{if(lock.current||busy)return;lock.current=true;setFailure('');try{const result=await actFull(action,{id:item.task.id});if(!mounted.current)return;if(!result.ok){setFailure(result.error);return;}setConfirm(null);setMessage(action==='restore'?t('restored')+' '+item.task.date:t('purged'));}finally{lock.current=false;}};
+        const run=async(action,item)=>{if(lock.current||busy)return;lock.current=true;setFailure('');try{const result=await taskWrite(action,{id:item.task.id,expectedToken:action==='trashPurge'?confirm?.token:item.task.editToken});if(!mounted.current)return;if(!result.ok){setFailure(result.error);return;}setConfirm(null);setMessage(action==='restore'?t('restored')+' '+item.task.date:t('purged'));}finally{lock.current=false;}};
         const trash=[...(s?.trash||[])].sort((a,b)=>b.deletedAt-a.deletedAt);
         return h('details',{className:'fc-card'},h('summary',null,t('trashTitle'),' · ',trash.length),h('p',{className:'fc-muted'},t('trashHint')),
           trash.length?trash.map(item=>h('article',{className:'fc-trash-row',key:item.task.id},h('strong',null,item.task.title),h('div',{className:'fc-muted'},item.task.date,' ',item.task.time||''),
             h('div',{className:'fc-muted'},t('deletedAt'),': ',new Date(item.deletedAt).toLocaleString(ctx.locale.getLocale().active)),h('div',{className:'fc-muted'},t('retention'),': ',retentionDays(item.deletedAt,clock+snapshot.serverOffset)),
-            h('div',{className:'fc-row'},button('restore',()=>run('restore',item),{disabled:busy,className:'fc-small'}),confirm===item.task.id?h(React.Fragment,null,h('span',{className:'fc-error'},t('purgeWarning')),button('purgeConfirm',()=>run('trashPurge',item),{disabled:busy,className:'fc-small'}),button('cancel',()=>setConfirm(null),{className:'fc-small'})):button('purge',()=>setConfirm(item.task.id),{disabled:busy,className:'fc-small'})))):h('p',{className:'fc-muted'},t('trashEmpty')),
+            h('div',{className:'fc-row'},button('restore',()=>run('restore',item),{disabled:busy,className:'fc-small'}),confirm?.id===item.task.id?h(React.Fragment,null,h('span',{className:'fc-error'},t('purgeWarning')),button('purgeConfirm',()=>run('trashPurge',item),{disabled:busy,className:'fc-small'}),button('cancel',()=>setConfirm(null),{className:'fc-small'})):button('purge',()=>setConfirm({id:item.task.id,token:item.task.editToken}),{disabled:busy,className:'fc-small'})))):h('p',{className:'fc-muted'},t('trashEmpty')),
           message&&h('p',{role:'status',className:'fc-muted'},message),failure&&h('p',{role:'alert',className:'fc-error'},failure));
       }
 
       // A stable component identity and draft key prevent polling from remounting inputs.
       function TaskEditor({date,taskId,task,focusToken,onExit,onSaved}) {
         const {busy}=useStore();
-        const key=taskId?'edit:'+taskId:'new:'+date;
+        const key=taskId?'edit:'+taskId:'new:'+date,writeKey='editor:'+key;
         React.useSyncExternalStore(drafts.subscribe,drafts.getSnapshot);
+        React.useSyncExternalStore(journal.subscribe,journal.getSnapshot);
         const getValue=()=>drafts.get(key,task?{title:task.title,time:task.time,date:task.date}:emptyDraft(date));
-        const value=getValue();
-        const [saving,setSaving]=React.useState(false);
+        const value=getValue(),pending=journal.get(writeKey);
+        const [saving,setSaving]=React.useState(false),[failure,setFailure]=React.useState(''),[reloadConfirm,setReloadConfirm]=React.useState(false);
         const input=React.useRef(null),form=React.useRef(null),mounted=React.useRef(false);
         const composing=React.useRef(false),compositionEndedAt=React.useRef(-Infinity);
-        const locked=saving||pendingDrafts.has(key);
+        const locked=saving||pendingDrafts.has(key)||!!pending;
         const missing=!!taskId&&!task;
+        const stale=!!taskId&&(missing||!hasEditToken(value.expectedToken)||value.expectedToken!==task.editToken);
         React.useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
         React.useEffect(()=>{if(focusToken.key===key)input.current?.focus();},[focusToken,key]);
-        const change=patch=>{
-          if(pendingDrafts.has(key))return;
-          drafts.set(key,{...getValue(),...patch});
-        };
+        const change=patch=>{if(locked)return;drafts.set(key,{...getValue(),...patch});};
         const submit=async(event,asNew=false)=>{
           event.preventDefault();
-          const sent=getValue();
-          if(composing.current||Date.now()-compositionEndedAt.current<80||pendingDrafts.has(key)||busy||!sent.title.trim()||!localDate(sent.date)||(missing&&!asNew))return;
-          drafts.set(key,sent);pendingDrafts.add(key);setSaving(true);
+          if(composing.current||Date.now()-compositionEndedAt.current<80||pendingDrafts.has(key)||saving||busy)return;
+          const sent=getValue(),existing=journal.get(writeKey);
+          if(!existing&&(!sent.title.trim()||!localDate(sent.date)||stale&&!asNew)){setFailure(t(stale?'conflictDraft':'writeFailed'));return;}
+          if(existing&&asNew){setFailure(t('pendingWrite'));return;}
+          pendingDrafts.add(key);setSaving(true);setFailure('');
           try {
-            const result=await act(taskId&&!asNew?'update':'add',{...(taskId&&!asNew?{id:taskId}:{}),title:sent.title.trim(),time:sent.time,date:sent.date});
-            if(!result)return;
-            const keepFocus=mounted.current&&!!form.current?.contains(document.activeElement);
-            const cleared=drafts.clearIfUnchanged(key,sent);
-            if(cleared){
-              // Update the shared draft/view store even if this editor was closed mid-request.
-              const currentView=drafts.getView();
-              if(taskId&&currentView.editing===taskId)drafts.setView({editing:null,filter:'all'});
-              else if(!taskId&&currentView.date===date&&!currentView.editing)drafts.setView({filter:'all'});
-              if(mounted.current){
-                onSaved({key:taskId&&!asNew?(task&&task.date!==sent.date?'moved':'updated'):'added',date:sent.date},!!taskId,keepFocus);
-                if(!taskId&&keepFocus)input.current?.focus();
-              }
+            const keepFocus=()=>mounted.current&&!!form.current?.contains(document.activeElement);
+            const result=existing?await retryWrite(existing):await taskWrite(taskId&&!asNew?'update':'add',{...(taskId&&!asNew?{id:taskId,expectedToken:sent.expectedToken}:{}),title:sent.title.trim(),time:sent.time,date:sent.date},writeKey,sent);
+            if(!result.ok){if(mounted.current)setFailure(result.error||t('writeFailed'));return;}
+            if(result.draftResult?.newer){publish({error:t('newerUnsaved')});return;}
+            const currentView=drafts.getView();
+            if(mounted.current&&result.draftResult?.cleared){
+              onSaved({key:result.receipt.replayed?'confirmedSave':taskId&&!asNew?(task&&task.date!==sent.date?'moved':'updated'):'added',date:sent.date},!!taskId,keepFocus());
+              if(!taskId&&keepFocus())input.current?.focus();
             }
+            if(taskId&&currentView.editing===taskId&&result.draftResult?.cleared)drafts.setView({editing:null,filter:'all'});
           } finally {pendingDrafts.delete(key);publish({});if(mounted.current)setSaving(false);}
         };
         const keyboard=event=>{
           if(composingEnter(event,composing.current,compositionEndedAt.current,Date.now())){event.preventDefault();return;}
-          if(event.key==='Escape'&&taskId&&!composing.current&&!event.nativeEvent?.isComposing&&!locked){event.preventDefault();onExit();}
+          if(event.key==='Escape'&&taskId&&!composing.current&&!event.nativeEvent?.isComposing&&!saving){event.preventDefault();onExit();}
         };
-        return h('form',{ref:form,className:'fc-form','data-editing':!!taskId,'aria-busy':locked,onSubmit:submit,onKeyDown:keyboard},
-          h('div',{className:'fc-form-head'},h('strong',null,t(taskId?'editing':'newTask')),h('span',{className:'fc-badge'},locked?t('saving'):drafts.has(key)?t('draftBadge'):'')),
+        const reload=()=>{
+          if(!task||locked)return;
+          if(!reloadConfirm){setReloadConfirm(true);return;}
+          drafts.set(key,{title:task.title,time:task.time,date:task.date,expectedToken:task.editToken});setReloadConfirm(false);setFailure('');
+        };
+        return h('form',{ref:form,className:'fc-form','data-editing':!!taskId,'aria-busy':saving,onSubmit:submit,onKeyDown:keyboard},
+          h('div',{className:'fc-form-head'},h('strong',null,t(taskId?'editing':'newTask')),h('span',{className:'fc-badge'},saving?t('saving'):pending?t('pendingWrite'):drafts.has(key)?t('draftBadge'):'')),
           h('label',null,t('taskTitle'),h('input',{ref:input,value:value.title,readOnly:locked,required:true,maxLength:200,placeholder:t('taskTitle'),onChange:e=>change({title:e.target.value}),onCompositionStart:()=>{composing.current=true;},onCompositionEnd:()=>{composing.current=false;compositionEndedAt.current=Date.now();}})),
           h('div',{className:'fc-form-fields'},
             taskId&&h('label',null,t('targetDate'),h('input',{type:'date',value:value.date,min:'0001-01-01',max:'9999-12-31',readOnly:locked,required:true,onChange:e=>{if(localDate(e.target.value))change({date:e.target.value});}})),
             h('label',null,t('time'),h('input',{type:'time',value:value.time,readOnly:locked,onChange:e=>change({time:e.target.value})}))),
-          missing&&h('p',{role:'alert',className:'fc-error fc-hint'},t('missingTask')),
-          h('div',{className:'fc-row'},h('button',{type:'submit',className:'fc-primary','aria-disabled':locked||busy||!value.title.trim()||missing},t(locked?'saving':taskId?'save':'add')),
-            missing&&button('saveAsNew',e=>{if(form.current?.reportValidity())submit(e,true);},{disabled:locked||busy||!value.title.trim()}),
-            taskId&&button('exitEdit',onExit,{disabled:locked})),
+          stale&&!pending&&h('p',{role:'alert',className:'fc-error fc-hint'},t('conflictDraft')),
+          pending&&h('p',{role:'status',className:'fc-muted'},t(Date.now()-pending.createdAt>=WRITE_TTL?'writeExpired':'pendingWrite')),
+          failure&&h('p',{role:'alert',className:'fc-error'},failure),
+          h('div',{className:'fc-row'},pending?button('retryOriginal',e=>submit(e),{disabled:saving||busy||Date.now()-pending.createdAt>=WRITE_TTL}):h('button',{type:'submit',className:'fc-primary','aria-disabled':saving||busy||!value.title.trim()||stale},t(saving?'saving':taskId?'save':'add')),
+            stale&&!pending&&button('copyNew',e=>{if(form.current?.reportValidity())submit(e,true);},{disabled:saving||busy||!value.title.trim()}),
+            stale&&task&&!pending&&button(reloadConfirm?'reloadConfirm':'reloadOriginal',reload,{disabled:saving||busy}),
+            taskId&&button('exitEdit',onExit,{disabled:saving})),
           h('p',{className:'fc-muted fc-hint'},t(taskId?'editHint':'enterHint')),
           h('p',{className:'fc-muted fc-hint'},t(drafts.persistent?'draftHint':'draftMemory')));
       }
@@ -354,13 +470,13 @@ window.__ModuleLoader__.load({
         const chooseDate=next=>{if(!localDate(next))return;setCurrent({date:next,editing:null});setDeleting(null);setFocusToken(current=>({key:null,nonce:current.nonce+1}));};
         const beginEdit=task=>{
           if(busy)return;
-          if(!drafts.has('edit:'+task.id))drafts.set('edit:'+task.id,{title:task.title,time:task.time,date:task.date});
+          if(!drafts.has('edit:'+task.id))drafts.set('edit:'+task.id,{title:task.title,time:task.time,date:task.date,expectedToken:task.editToken});
           setCurrent({editing:task.id});setDeleting(null);setFocusToken(current=>({key:'edit:'+task.id,nonce:current.nonce+1}));
         };
         const exitEdit=(focus=true)=>{setCurrent({editing:null});setFocusToken(current=>({key:focus?'new:'+drafts.getView().date:null,nonce:current.nonce+1}));};
         const runTask=async(action,args,success)=>{
           if(opLock.current||busy)return;opLock.current=true;
-          try{const result=await act(action,args);if(result){success?.();return true;}return false;}finally{opLock.current=false;}
+          try{const result=taskWriteActions.includes(action)?await taskWrite(action,args):await actFull(action,args);if(result.ok){success?.(result.state,result);return true;}return false;}finally{opLock.current=false;}
         };
         const permission=async()=>{try{if(!('Notification'in window)){setMessage(t('unsupported'));return;}const p=await Notification.requestPermission();if(p==='granted'){localStorage.setItem('focus-calendar.notifications','yes');setMessage(t('granted'));}else setMessage(t('denied'));}catch{setMessage(t('unsupported'));}};
         const now=clock+snapshot.serverOffset,today=dayKey(new Date(clock)),chosen=localDate(date);
@@ -390,20 +506,20 @@ window.__ModuleLoader__.load({
               h('section',{className:'fc-card'},
                 h('div',{className:'fc-head',style:{marginBottom:6}},h('div',null,h('h2',null,t('tasks')),h('div',{className:'fc-muted'},date,' · ',chosen.toLocaleDateString(ctx.locale.getLocale().active,{weekday:'long'}))),button('newTask',()=>exitEdit(),{className:'fc-small'})),
                 h('div',{className:'fc-row fc-muted'},`${day.done} / ${day.total} ${t('completed')}`),h('progress',{className:'fc-progress',value:day.done,max:Math.max(1,day.total),'aria-label':t('dateProgress')}),
-                notice&&h('div',{className:'fc-notice',role:'status'},h('span',{className:'fc-notice-text'},t(notice.key),' ',notice.date||''),notice.date&&notice.date!==date&&button('showDate',()=>chooseDate(notice.date),{className:'fc-small'}),notice.undoId&&(s.trash||[]).some(entry=>entry.task.id===notice.undoId)&&button('undoDelete',()=>runTask('restore',{id:notice.undoId},()=>setNotice({key:'restored'})),{className:'fc-small',disabled:busy}),button('dismiss',()=>setNotice(null),{className:'fc-small'})),
+                notice&&h('div',{className:'fc-notice',role:'status'},h('span',{className:'fc-notice-text'},t(notice.key),' ',notice.date||''),notice.date&&notice.date!==date&&button('showDate',()=>chooseDate(notice.date),{className:'fc-small'}),notice.undoId&&(s.trash||[]).some(entry=>entry.task.id===notice.undoId)&&button('undoDelete',()=>runTask('restore',{id:notice.undoId,expectedToken:notice.undoToken},()=>setNotice({key:'restored'})),{className:'fc-small',disabled:busy}),button('dismiss',()=>setNotice(null),{className:'fc-small'})),
                 h(TaskEditor,{key:editing?'edit:'+editing:'new:'+date,date,taskId:editing,task,focusToken,onExit:()=>exitEdit(),onSaved:(next,wasEditing,keepFocus)=>{setNotice(next);if(wasEditing)setFocusToken(current=>({key:keepFocus?'new:'+drafts.getView().date:null,nonce:current.nonce+1}));}}),
                 h('div',{className:'fc-filter',role:'group','aria-label':t('filter')},...['all','pending','done'].map(value=>h('button',{type:'button',key:value,className:'fc-small','aria-pressed':filter===value,onClick:()=>setCurrent({filter:value})},t(value==='done'?'completed':value),' ',value==='all'?day.total:value==='done'?day.done:day.total-day.done))),
                 tasks.length?tasks.map(item=>h('div',{className:'fc-task',key:item.id,'data-editing':editing===item.id},
-                  h('input',{type:'checkbox',checked:item.done,disabled:busy,'aria-label':t(item.done?'undo':'complete')+': '+item.title,onChange:e=>runTask('update',{id:item.id,done:e.target.checked})}),
+                  h('input',{type:'checkbox',checked:item.done,disabled:busy,'aria-label':t(item.done?'undo':'complete')+': '+item.title,onChange:e=>runTask('update',{id:item.id,done:e.target.checked,expectedToken:item.editToken})}),
                   h('div',{className:'fc-task-text','data-done':item.done},h('div',null,item.title),h('div',{className:'fc-muted'},item.time||t('allDay')),h('div',{className:'fc-task-focus'},t('focusTotal'),': ',focusStats(item,s.focus,now).minutes,' ',t('minutes'),' · ',t('focusRounds'),': ',focusStats(item,s.focus,now).rounds),focusStats(item,s.focus,now).segment>0&&h('div',{className:'fc-task-focus'},t('focusSegment'),': ',fmt(focusStats(item,s.focus,now).segment))),
                   h('div',{className:'fc-task-actions'},button('focusTask',()=>runTask('focusStart',{id:item.id}),{className:'fc-small',disabled:busy||item.done||s.focus.status!=='idle',title:item.done||s.focus.status!=='idle'?t('focusUnavailable'):t('focusTask')}),button('edit',()=>beginEdit(item),{className:'fc-small',disabled:busy,'aria-label':t('edit')+': '+item.title}),
-                    deleting===item.id?h(React.Fragment,null,button('confirmDelete',()=>runTask('delete',{id:item.id},()=>{drafts.drop('edit:'+item.id);setDeleting(null);if(drafts.getView().editing===item.id)exitEdit(false);setNotice({key:'deleted',undoId:item.id});}),{className:'fc-small',disabled:busy}),button('cancel',()=>setDeleting(null),{className:'fc-small'})):button('remove',()=>setDeleting(item.id),{className:'fc-small',disabled:busy,'aria-label':t('remove')+': '+item.title}))
+                    deleting?.id===item.id?h(React.Fragment,null,button('confirmDelete',()=>runTask('delete',{id:item.id,expectedToken:deleting.token},(resultState,result)=>{drafts.drop('edit:'+item.id);setDeleting(null);if(drafts.getView().editing===item.id)exitEdit(false);setNotice({key:'deleted',undoId:item.id,undoToken:result.receipt.taskToken});}),{className:'fc-small',disabled:busy}),button('cancel',()=>setDeleting(null),{className:'fc-small'})):button('remove',()=>setDeleting({id:item.id,token:item.editToken}),{className:'fc-small',disabled:busy,'aria-label':t('remove')+': '+item.title}))
                 )):h('p',{className:'fc-muted'},t(day.total===0?'empty':filter==='pending'?'noPending':'noCompleted')))),
             h('div',{className:'fc-stack'},
               h('section',{className:'fc-card'},h('h2',null,t('focus')),h('p',{className:'fc-muted'},t('focusHint')),s.focus.status!=='idle'&&s.focus.taskId&&h('div',{className:'fc-current-task'},t('currentTask'),': ',s.tasks.find(item=>item.id===s.focus.taskId)?.title||t('taskUnavailable')),h('div',{className:'fc-status'},t(s.focus.status==='idle'?'idle':s.focus.status==='paused'?'paused':s.focus.kind==='break'?'breaking':'running')),h('div',{className:'fc-timer','aria-label':t('remaining')},fmt(remaining)),
                 h('div',{className:'fc-row'},s.focus.status==='running'?button('pause',()=>act('focusPause'),{disabled:busy}):s.focus.status==='paused'?button('resume',()=>act('focusResume'),{disabled:busy,className:'fc-primary'}):button('start',()=>act('focusStart'),{disabled:busy,className:'fc-primary'}),button('reset',()=>act('focusReset'),{disabled:busy||s.focus.status==='idle'}),button('rest',()=>act('breakStart'),{disabled:busy||s.focus.status!=='idle',title:t('stopFirst')}))),
               h('section',{className:'fc-card'},h('h2',null,t('reminders')),...['eye','body'].map(kind=>h('div',{className:'fc-health',key:kind},h('div',null,h('strong',null,t(kind)),h('div',{className:'fc-muted'},t('interval'),' ',s.settings[kind+'Minutes'],' ',t('minutes'),' · ',s.reminders[kind].running?fmt(s.reminders[kind].nextAt-now):t('off'))),h('button',{type:'button',role:'switch','aria-checked':s.reminders[kind].running,'aria-label':t(kind),disabled:busy,onClick:()=>act(s.reminders[kind].running?'remindersStop':'remindersStart',{kind})},t(s.reminders[kind].running?'disable':'enable')))),(s.snoozed||[]).length>0&&h('div',{className:'fc-snoozed'},h('strong',null,t('snoozedTitle')),h('p',{className:'fc-muted'},t('snoozedHint')),...s.snoozed.map(alert=>h('div',{className:'fc-muted',key:alert.id},t(alert.kind+'Alert'),' · ',fmt(alert.dueAt-now)))),h('p',null,button('notify',permission,{className:'fc-small'})),message&&h('p',{className:'fc-muted',role:'status'},message)),
-              h(BackupPanel),h(TrashPanel),
+              h(PendingWrites),h(BackupPanel),h(TrashPanel),
               h('details',{className:'fc-card'},h('summary',null,t('settings')),h('form',{className:'fc-form',onSubmit:async e=>{e.preventDefault();if(await act('settings',{settings:settings||s.settings})){setSettings(null);setMessage(t('saved'));}}},h('div',{className:'fc-settings'},...['focusMinutes','eyeMinutes','bodyMinutes','breakMinutes'].map(key=>h('label',{key},t(key)+' ('+t('minutes')+')',h('input',{type:'number',min:1,max:240,step:1,required:true,value:(settings||s.settings)[key],readOnly:busy,onChange:e=>setSettings({...s.settings,...settings,[key]:e.target.value===''?'':Number(e.target.value)})})))),h('p',{className:'fc-muted'},t('settingsHint')),h('button',{type:'submit',disabled:busy},t('save')))))
           ),
           h('details',{className:'fc-footer fc-muted'},h('summary',null,t('noteTitle')),h('p',null,t('note')),h('p',null,t('draftHint'))),h('p',{className:'fc-muted'},t('shortcut'),' · ',t('timezone'))));
@@ -420,7 +536,7 @@ window.__ModuleLoader__.load({
             a.kind==='focus'&&h('div',{className:'fc-row fc-alert-actions'},
               button('continueFocus',()=>run(()=>actionThenAck(actFull,'focusStart',a.taskId?{id:a.taskId}:{},a.id)),{disabled:busy||!canContinue,title:!canContinue?t('focusUnavailable'):t('continueFocus')}),
               button('rest',()=>run(()=>actionThenAck(actFull,'breakStart',{},a.id)),{disabled:busy||s.focus.status!=='idle',title:t('stopFirst')}),
-              a.taskId&&button('finishTask',()=>run(()=>actionThenAck(actFull,'update',{id:a.taskId,done:true},a.id)),{disabled:busy||!task||task.done})),
+              a.taskId&&button('finishTask',()=>run(()=>actionThenAck((action,args)=>action==='update'?taskWrite(action,args):actFull(action,args),'update',{id:a.taskId,done:true,expectedToken:task?.editToken},a.id)),{disabled:busy||!task||task.done})),
             h('div',{className:'fc-row fc-alert-actions'},button('snooze5',()=>run(()=>actFull('snooze',{id:a.id,minutes:5})),{disabled:busy}),button('snooze10',()=>run(()=>actFull('snooze',{id:a.id,minutes:10})),{disabled:busy})),
             h('div',{className:'fc-row fc-alert-actions'},button('ack',()=>run(()=>actFull('ack',{id:a.id})),{disabled:busy}),button('open',()=>ctx.layout.selectPanel('focus-calendar'))));
         }),error&&h('p',{className:'fc-error',role:'alert'},error));

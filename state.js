@@ -4,6 +4,10 @@ export const ACTIONS = ['read','add','update','delete','restore','trashPurge','s
 export const DEFAULT_SETTINGS = { focusMinutes:25, eyeMinutes:20, bodyMinutes:60, breakMinutes:5 };
 export const TRASH_TTL = 30*24*60*60*1000;
 export const MAX_TASKS = 2000;
+export const RECEIPT_TTL = 7*24*60*60*1000;
+export const MAX_RECEIPTS = 4096;
+const TASK_WRITES = new Set(['add','update','delete','restore','trashPurge']);
+const fail = (code,message,conflict) => { const error=new Error(message);error.code=code;if(conflict)error.conflict=conflict;throw error; };
 const MAX_SAFE = Number.MAX_SAFE_INTEGER;
 const assert = (condition,message) => {if(!condition)throw new Error(message);};
 const own = (obj,key) => Object.prototype.hasOwnProperty.call(obj,key);
@@ -16,7 +20,7 @@ function fields(value,allowed,required,label){
   assert(required.every(key=>own(value,key)),`${label}缺少必填字段`);
 }
 export function initialState(){
-  return {tasks:[],settings:{...DEFAULT_SETTINGS},focus:{status:'idle',kind:'focus',endsAt:null,remainingMs:0,taskId:null,segmentStartedAt:null},reminders:{eye:{running:false,nextAt:null},body:{running:false,nextAt:null}},alerts:[],trash:[],snoozed:[],recovery:null};
+  return {tasks:[],settings:{...DEFAULT_SETTINGS},focus:{status:'idle',kind:'focus',endsAt:null,remainingMs:0,taskId:null,segmentStartedAt:null},reminders:{eye:{running:false,nextAt:null},body:{running:false,nextAt:null}},alerts:[],trash:[],snoozed:[],recovery:null,receipts:[]};
 }
 export function validDate(value){
   if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(value))return false;
@@ -24,13 +28,14 @@ export function validDate(value){
   return Number.isFinite(d.getTime())&&d.toISOString().slice(0,10)===value;
 }
 export function validTime(value){return typeof value==='string'&&(value===''||/^([01]\d|2[0-3]):[0-5]\d$/.test(value));}
-function normalizeTask(task){return {...task,focusMs:task.focusMs??0,focusRounds:task.focusRounds??0};}
+function normalizeTask(task){return {...task,focusMs:task.focusMs??0,focusRounds:task.focusRounds??0,_editVersion:task._editVersion??randomUUID()};}
+function publicTask(task){const {_editVersion,...copy}=task;return copy;}
 /** Compatibility normalization adds fields without changing IDs, titles, or prior timestamps. */
 export function normalizeState(current){
   const state=structuredClone(current);
   state.tasks=state.tasks.map(normalizeTask);
   state.trash=(state.trash??[]).map(entry=>({...entry,task:normalizeTask(entry.task)}));
-  state.snoozed??=[];state.recovery??=null;
+  state.snoozed??=[];state.recovery??=null;state.receipts??=[];
   state.focus.taskId??=null;
   state.focus.segmentStartedAt??=null;
   return state;
@@ -97,12 +102,22 @@ export function normalizeBackup(value){
   const ids=new Set();for(const task of [...tasks,...trash.map(item=>item.task)]){assert(!ids.has(task.id),'备份包含重复任务ID（包括回收站）');ids.add(task.id);}
   return {format:'dsh-focus-calendar',version:1,exportedAt:value.exportedAt,tasks,settings,trash};
 }
-export function exportBackup(state,now){return {format:'dsh-focus-calendar',version:1,exportedAt:now,tasks:structuredClone(state.tasks),settings:{...state.settings},trash:structuredClone(state.trash)};}
+export function exportBackup(state,now){return {format:'dsh-focus-calendar',version:1,exportedAt:now,tasks:state.tasks.map(task=>structuredClone(publicTask(task))),settings:{...state.settings},trash:state.trash.map(entry=>({task:structuredClone(publicTask(entry.task)),deletedAt:entry.deletedAt}))};}
 function canonical(value){return Array.isArray(value)?value.map(canonical):object(value)?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;}
 const fingerprint = value => createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');
+export function taskEditToken(task,location='active',deletedAt=null){
+  return fingerprint({location,deletedAt,version:task._editVersion??null,id:task.id,date:task.date,title:task.title,time:task.time,done:task.done});
+}
+function locatedToken(state,id){
+  const active=state.tasks.find(task=>task.id===id);
+  if(active)return taskEditToken(active);
+  const trash=state.trash.find(entry=>entry.task.id===id);
+  return trash?taskEditToken(trash.task,'trash',trash.deletedAt):null;
+}
+function receiptResult(receipt,replayed){return {requestId:receipt.requestId,taskId:receipt.taskId,taskToken:receipt.taskToken,replayed,expiresAt:receipt.createdAt+RECEIPT_TTL};}
 function previewToken(state,backup,tokenSalt){return fingerprint({tokenSalt,backup,current:{tasks:state.tasks,settings:state.settings,trash:state.trash}});}
 function previewOf(state,backup,tokenSalt){
-  const existing=new Map([...state.tasks.map(task=>[task.id,{type:'active',task}]),...state.trash.map(entry=>[entry.task.id,{type:'trash',...entry}])]);
+  const existing=new Map([...state.tasks.map(task=>[task.id,{type:'active',task:publicTask(task)}]),...state.trash.map(entry=>[entry.task.id,{type:'trash',task:publicTask(entry.task),deletedAt:entry.deletedAt}])]);
   let added=0,conflicts=0,duplicates=0;
   for(const entry of [...backup.tasks.map(task=>({type:'active',task})),...backup.trash.map(item=>({type:'trash',...item}))]){
     const current=existing.get(entry.task.id);
@@ -118,9 +133,29 @@ function stopAll(state,now){
 function operation(current,request,now,id,tokenSalt=''){
   assert(object(request),'操作必须是对象');assert(ACTIONS.includes(request.action),'未知操作');
   const allowed={read:[],add:['date','title','time'],update:['id','date','title','time','done'],delete:['id'],restore:['id'],trashPurge:['id'],settings:['settings'],focusStart:['id'],focusPause:[],focusResume:[],focusReset:[],remindersStart:['kind'],remindersStop:['kind'],ack:['id'],snooze:['id','minutes'],breakStart:[],export:[],importPreview:['backup'],import:['backup','mode','token'],recoveryExport:[]};
+  if(TASK_WRITES.has(request.action))allowed[request.action].push('requestId');
+  if(TASK_WRITES.has(request.action)&&request.action!=='add')allowed[request.action].push('expectedToken');
   assert(Object.keys(request).every(key=>key==='action'||allowed[request.action].includes(key)),'操作包含不支持的参数');
   assert(safeNumber(now),'时钟时间无效');
-  const state=reconcile(normalizeState(current),now,id),extras={};
+  const state=normalizeState(current),extras={};
+  state.receipts=state.receipts.filter(receipt=>now-receipt.createdAt<RECEIPT_TTL);
+  let payloadHash;
+  if(own(request,'requestId')){
+    assert(validId(request.requestId)&&request.requestId.length>=16,'requestId须为16至128字符');
+    const {requestId,...payload}=request;payloadHash=fingerprint(payload);
+    const receipt=state.receipts.find(item=>item.requestId===requestId);
+    if(receipt){
+      if(receipt.payloadHash!==payloadHash)fail('REQUEST_ID_REUSED','请求ID已用于不同内容；请勿修改原请求后重试');
+      reconcile(state,now,id);extras.receipt=receiptResult(receipt,true);return {state,extras};
+    }
+    if(state.receipts.length>=MAX_RECEIPTS)fail('RECEIPT_CAPACITY','防重复回执已达4096条上限，请等待回执过期；未执行此次操作');
+  }
+  reconcile(state,now,id);
+  if(own(request,'expectedToken')){
+    assert(typeof request.expectedToken==='string'&&/^[a-f0-9]{64}$/.test(request.expectedToken),'expectedToken须为read返回的editToken');
+    const currentToken=locatedToken(state,request.id);
+    if(currentToken!==request.expectedToken)fail('CONFLICT','任务已在另一处修改、移动或删除；本次操作未执行，请核对最新任务',{id:request.id??'',currentToken});
+  }
   const taskFields=(input,add)=>{
     const patch={};
     if(add||own(input,'date')){assert(validDate(input.date),'日期须为有效 YYYY-MM-DD');patch.date=input.date;}
@@ -134,16 +169,16 @@ function operation(current,request,now,id,tokenSalt=''){
     case 'add':{
       assert(state.tasks.length<MAX_TASKS,'最多保存2000项任务');
       const taskId=id();assert(validId(taskId)&&!state.tasks.some(task=>task.id===taskId)&&!state.trash.some(item=>item.task.id===taskId),'任务ID冲突');
-      state.tasks.push({id:taskId,...taskFields(request,true),done:false,focusMs:0,focusRounds:0});break;
+      state.tasks.push(normalizeTask({id:taskId,...taskFields(request,true),done:false,focusMs:0,focusRounds:0}));break;
     }
-    case 'update':{const task=state.tasks.find(item=>item.id===request.id);assert(task,'任务不存在');Object.assign(task,taskFields(request,false));break;}
+    case 'update':{const task=state.tasks.find(item=>item.id===request.id);assert(task,'任务不存在');const before=taskEditToken(task);Object.assign(task,taskFields(request,false));if(taskEditToken(task)!==before)task._editVersion=randomUUID();break;}
     case 'delete':{
       const index=state.tasks.findIndex(item=>item.id===request.id);assert(index>=0,'任务不存在');assert(state.trash.length<MAX_TASKS,'回收站已满，请先恢复或明确永久删除项目');
       if(state.focus.taskId===request.id&&state.focus.status!=='idle'){settleFocus(state,now);state.focus=initialState().focus;}
-      state.trash.push({task:state.tasks.splice(index,1)[0],deletedAt:now});break;
+      const removed=state.tasks.splice(index,1)[0];removed._editVersion=randomUUID();state.trash.push({task:removed,deletedAt:now});break;
     }
     case 'restore':{
-      const index=state.trash.findIndex(item=>item.task.id===request.id);assert(index>=0,'回收站任务不存在或已过期');assert(state.tasks.length<MAX_TASKS,'任务已达2000项上限');assert(!state.tasks.some(task=>task.id===request.id),'本机已有相同ID任务');state.tasks.push(state.trash.splice(index,1)[0].task);break;
+      const index=state.trash.findIndex(item=>item.task.id===request.id);assert(index>=0,'回收站任务不存在或已过期');assert(state.tasks.length<MAX_TASKS,'任务已达2000项上限');assert(!state.tasks.some(task=>task.id===request.id),'本机已有相同ID任务');const restored=state.trash.splice(index,1)[0].task;restored._editVersion=randomUUID();state.tasks.push(restored);break;
     }
     case 'trashPurge':{const index=state.trash.findIndex(item=>item.task.id===request.id);assert(index>=0,'回收站任务不存在');state.trash.splice(index,1);break;}
     case 'settings':{
@@ -182,19 +217,29 @@ function operation(current,request,now,id,tokenSalt=''){
       stopAll(state,now);
       if(request.mode==='replace'){
         state.recovery={createdAt:now,backup:exportBackup(state,now)};
-        state.tasks=backup.tasks;state.settings=backup.settings;state.trash=backup.trash;
+        state.tasks=backup.tasks.map(normalizeTask);state.settings=backup.settings;state.trash=backup.trash.map(entry=>({...entry,task:normalizeTask(entry.task)}));
       }else{
         const existing=new Set([...state.tasks.map(task=>task.id),...state.trash.map(item=>item.task.id)]);
         const newTasks=backup.tasks.filter(task=>!existing.has(task.id)),newTrash=backup.trash.filter(item=>!existing.has(item.task.id));
-        assert(state.tasks.length+newTasks.length<=MAX_TASKS&&state.trash.length+newTrash.length<=MAX_TASKS,'合并将超过任务或回收站2000项上限');state.tasks.push(...newTasks);state.trash.push(...newTrash);
+        assert(state.tasks.length+newTasks.length<=MAX_TASKS&&state.trash.length+newTrash.length<=MAX_TASKS,'合并将超过任务或回收站2000项上限');state.tasks.push(...newTasks.map(normalizeTask));state.trash.push(...newTrash.map(entry=>({...entry,task:normalizeTask(entry.task)})));
       }
       state.trash=state.trash.filter(item=>now-item.deletedAt<TRASH_TTL);break;
     }
   }
+  if(payloadHash){
+    const taskId=request.action==='add'?state.tasks.at(-1).id:request.id;
+    const receipt={requestId:request.requestId,payloadHash,action:request.action,taskId,taskToken:locatedToken(state,taskId),createdAt:now};
+    state.receipts.push(receipt);extras.receipt=receiptResult(receipt,false);
+  }
   return {state,extras};
 }
 export function transition(current,request,now=Date.now(),id=randomUUID){return operation(current,request,now,id).state;}
-function clientState(state,now){const copy=structuredClone(state);copy.recovery=state.recovery?{createdAt:state.recovery.createdAt,taskCount:state.recovery.backup.tasks.length}:null;return {...copy,now};}
+function clientState(state,now){
+  const copy=structuredClone(state);delete copy.receipts;
+  copy.tasks=state.tasks.map(task=>({...publicTask(task),editToken:taskEditToken(task)}));
+  copy.trash=state.trash.map(entry=>({deletedAt:entry.deletedAt,task:{...publicTask(entry.task),editToken:taskEditToken(entry.task,'trash',entry.deletedAt)}}));
+  copy.recovery=state.recovery?{createdAt:state.recovery.createdAt,taskCount:state.recovery.backup.tasks.length}:null;return {...copy,now};
+}
 /** Serialize copy-on-write commits: a failed write publishes neither state nor successful extras. */
 export function createController({load,save,clock=Date.now,id=randomUUID}){
   let queue=Promise.resolve(),closed=false;
@@ -202,7 +247,16 @@ export function createController({load,save,clock=Date.now,id=randomUUID}){
   const tokenSalt=randomUUID();
   const dispatch=request=>{
     if(closed)return Promise.resolve({ok:false,error:'插件已停止'});
-    const run=queue.then(async()=>{try{const now=clock(),current=load();const {state,extras}=operation(current,request,now,id,tokenSalt);if(JSON.stringify(state)!==JSON.stringify(current))await save(state);return {ok:true,state:clientState(state,now),...extras};}catch(error){return {ok:false,error:error instanceof Error?error.message:'操作失败'};}});
+    // Snapshot the caller's payload before queueing; later object mutation cannot change intent.
+    let input;try{input=structuredClone(request);}catch{return Promise.resolve({ok:false,code:'INVALID_REQUEST',error:'请求必须是可序列化数据'});}
+    const run=queue.then(async()=>{
+      let saving=false;
+      try{
+        const now=clock(),current=load();const {state,extras}=operation(current,input,now,id,tokenSalt);
+        if(JSON.stringify(state)!==JSON.stringify(current)){saving=true;await save(state);saving=false;}
+        return {ok:true,state:clientState(state,now),...extras};
+      }catch(error){return {ok:false,error:error instanceof Error?error.message:'操作失败',code:saving?'WRITE_UNCERTAIN':error.code??'INVALID_REQUEST',...(error.conflict?{conflict:error.conflict}:{})};}
+    });
     queue=run.then(()=>{});return run;
   };
   return {dispatch,async close(){closed=true;await queue;}};
@@ -210,7 +264,7 @@ export function createController({load,save,clock=Date.now,id=randomUUID}){
 /** Persisted v1 schema adds defaults for the 1.1 shape; backups have a separate strict validator. */
 export function stateSchema(z){
   const timestamp=z.number().int().nonnegative().nullable();
-  const task=z.object({id:z.string().min(1),date:z.string().refine(validDate),title:z.string().min(1).max(200),time:z.string().refine(validTime),done:z.boolean(),focusMs:z.number().int().nonnegative().default(0),focusRounds:z.number().int().nonnegative().default(0)});
+  const task=z.object({id:z.string().min(1),date:z.string().refine(validDate),title:z.string().min(1).max(200),time:z.string().refine(validTime),done:z.boolean(),focusMs:z.number().int().nonnegative().default(0),focusRounds:z.number().int().nonnegative().default(0),_editVersion:z.string().min(1).optional()});
   const reminder=z.object({running:z.boolean(),nextAt:timestamp});
   const alert=z.object({id:z.string().min(1),kind:z.enum(['focus','eye','body','break']),at:z.number().int().nonnegative(),taskId:z.string().min(1).optional()});
   const backup=z.unknown().transform((value,ctx)=>{try{return normalizeBackup(value);}catch(error){ctx.addIssue({code:'custom',message:error.message});return z.NEVER;}});
@@ -221,5 +275,6 @@ export function stateSchema(z){
     trash:z.array(z.object({task,deletedAt:z.number().int().nonnegative()})).max(MAX_TASKS).default([]),
     snoozed:z.array(alert.extend({dueAt:z.number().int().nonnegative()})).max(4).default([]),
     recovery:z.object({createdAt:z.number().int().nonnegative(),backup}).nullable().default(null),
+    receipts:z.array(z.object({requestId:z.string().min(16).max(128),payloadHash:z.string().regex(/^[a-f0-9]{64}$/),action:z.enum(['add','update','delete','restore','trashPurge']),taskId:z.string().min(1).max(128),taskToken:z.string().nullable(),createdAt:z.number().int().nonnegative()})).max(MAX_RECEIPTS).default([]),
   });
 }

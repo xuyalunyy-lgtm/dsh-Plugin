@@ -14,6 +14,8 @@ export const parameters = {
     title: text('add必填、update可选；1至200字符。'),
     time: text('add/update任务时间，HH:mm或空字符串；add默认空。'),
     done: { type: 'boolean', description: '仅update：任务是否完成。' },
+    requestId: text('add/update/delete/restore/trashPurge可选，16至128字符。新任务写入应生成唯一ID，结果不明确时用同ID和完全相同参数重试；成功回执原子保留7天，最多4096条，满时拒绝新请求。同ID不同参数拒绝，超过保留期不保证去重。'),
+    expectedToken: text('update/delete/restore/trashPurge可选。新调用应传读取时对应task.editToken；编辑时冻结开始编辑的token，不能拿后台刷新token覆盖旧草稿。冲突会返回CONFLICT，应重新读取并人工核对；专注统计变化不会使token失效。'),
     settings: { type: 'object', additionalProperties: false, description: '仅settings：要修改的间隔，整数分钟1至240，至少一项；生效于下一次启动或提醒周期。', properties: Object.fromEntries(['focusMinutes', 'eyeMinutes', 'bodyMinutes', 'breakMinutes'].map(key => [key, { type: 'integer', minimum: 1, maximum: 240 }])) },
     kind: { type: 'string', enum: ['eye', 'body', 'all'], description: '仅remindersStart/Stop；默认all。' },
     minutes: { type: 'integer', enum: [5,10], description: '仅snooze：延后5或10分钟。' },
@@ -67,10 +69,10 @@ export async function apply(ctx) {
   }));
   ctx.effect(() => ctx.tools.register({
     name: 'focus_calendar',
-    description: '管理与日历页面共享的待办、任务专注统计、休息提醒及备份。delete移入30天回收站，trashPurge永久删除不可撤销。导入先预览再确认；替换前备份可用recoveryExport取回。返回状态及可选backup/preview，失败不部分写入。',
+    description: '管理与日历页面共享的待办、任务专注统计、休息提醒及备份。delete移入30天回收站，trashPurge永久删除不可撤销。导入先预览再确认；替换前备份可用recoveryExport取回。返回状态、任务editToken及可选backup/preview/receipt。旧调用兼容；推荐任务写入使用requestId和expectedToken防重复及冲突。WRITE_UNCERTAIN表示结果待确认，只能重试原请求，勿换ID。',
     parameters,
     output: {
-      schema: { type: 'object', properties: { ok: { type: 'boolean' }, state: { type: 'object', additionalProperties: true }, backup: { type:'object', additionalProperties:true }, preview: { type:'object', additionalProperties:true }, error: { type: 'string' } }, required: ['ok'], additionalProperties: false },
+      schema: { type: 'object', properties: { ok: { type: 'boolean' }, state: { type: 'object', additionalProperties: true }, backup: { type:'object', additionalProperties:true }, preview: { type:'object', additionalProperties:true }, receipt: { type:'object', additionalProperties:true }, conflict: { type:'object', additionalProperties:true }, code: {type:'string'}, error: { type: 'string' } }, required: ['ok'], additionalProperties: false },
       render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }],
     },
     execute: request => controller.dispatch(request),
