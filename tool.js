@@ -14,6 +14,8 @@ export function toolDefinition(repository) {
           palette: { type: 'string', enum: ['green','apricot','forest','sky','lavender','rose','mint','silver','midnight','plum','coffee','graphite'] },
           opacity: { type: 'integer', minimum: 0, maximum: 25 }, blur: { type: 'integer', minimum: 0, maximum: 16 },
           fit: { type: 'string', enum: ['cover', 'contain', 'repeat'] }, pattern: { type: 'boolean' },
+          positionX: { type: 'integer', minimum: 0, maximum: 100, description: '图片横向位置百分比，0左/50中/100右。' },
+          positionY: { type: 'integer', minimum: 0, maximum: 100, description: '图片纵向位置百分比，0上/50中/100下。' },
           image: { type: 'string', description: 'PNG/JPEG/WebP data URL，解码最多3MiB；空字符串移除图片。不接受路径或远程网址。' },
           name: { type: 'string', maxLength: 200 },
         } },

@@ -5,7 +5,7 @@ window.__ModuleLoader__.load({
     const h = React.createElement;
     const NS = 'local-qinglan';
     const KEY = 'dsh.qinglan.presentation.v1';
-    const defaults = { enabled: true, palette: 'green', opacity: 12, blur: 0, fit: 'cover', image: '', name: '', pattern: true };
+    const defaults = { enabled: true, palette: 'green', opacity: 12, blur: 0, fit: 'cover', image: '', name: '', pattern: true, positionX: 50, positionY: 50 };
     const palettes = {
       green: ['#f3f7ee', '#e8efdf', '#dce9d4', '#f5f8f0', '#c1d3b3', '#a0bd93', '#328049', '#263724', '#56694d', '#eaf1e3'],
       apricot: ['#faf5ed', '#f3eadc', '#eaddc9', '#fffaf3', '#ddcab1', '#c7ad8a', '#986437', '#3c3024', '#705b45', '#f4ecdf'],
@@ -36,8 +36,10 @@ window.__ModuleLoader__.load({
       inactive: '自定义外观已关闭，当前不会应用背景。', pending: '预览中，停止调整后自动保存…',
       resetParameters: '重置背景参数（保留图片）', resetAll: '恢复全部默认设置',
       resetWarning: '将恢复青岚配色并清除当前背景。若要保留当前外观，请先保存为方案。',
-      confirmReset: '确认恢复并移除图片', cancel: '取消', resetHelp: '仅重置显现度、模糊、铺放和纹理，不改变配色或图片。',
-      rawEmpty: '尚未选择背景图片', version: '版本 1.4.0',
+      confirmReset: '确认恢复并移除图片', cancel: '取消', resetHelp: '仅重置显现度、模糊、铺放、位置和纹理，不改变配色或图片。',
+      rawEmpty: '尚未选择背景图片', version: '版本 1.5.0',
+      positionX: '横向位置', positionY: '纵向位置', alignTop: '靠上', alignCenter: '居中', alignBottom: '靠下',
+      positionHint: '0% 为左侧 / 顶部，50% 为居中，100% 为右侧 / 底部。只有图片存在可移动或裁切空间时，位置变化才明显。',
       presets: '外观方案', presetName: '方案名称', savePreset: '保存当前外观', applyPreset: '应用', renamePreset: '重命名', deletePreset: '删除方案',
       presetHint: '将当前配色、图片与背景参数保存为一套方案，最多 20 套。', noPresets: '还没有保存的方案。',
       presetNameInvalid: '名称需为 1–40 字符，且不能与已有方案重名。',
@@ -57,8 +59,10 @@ window.__ModuleLoader__.load({
       inactive: 'Custom appearance is off; no background is applied.', pending: 'Previewing; saves when adjustment stops…',
       resetParameters: 'Reset background controls (keep image)', resetAll: 'Restore all defaults',
       resetWarning: 'This restores the Sage palette and clears the current background. Save a look first if you want to retain this appearance.',
-      confirmReset: 'Restore and remove image', cancel: 'Cancel', resetHelp: 'Resets visibility, blur, placement and texture only. Keeps your palette and image.',
-      rawEmpty: 'No background image selected', version: 'Version 1.4.0',
+      confirmReset: 'Restore and remove image', cancel: 'Cancel', resetHelp: 'Resets visibility, blur, placement, position and texture only. Keeps your palette and image.',
+      rawEmpty: 'No background image selected', version: 'Version 1.5.0',
+      positionX: 'Horizontal position', positionY: 'Vertical position', alignTop: 'Top', alignCenter: 'Center', alignBottom: 'Bottom',
+      positionHint: '0% is left/top, 50% is centered, 100% is right/bottom. Position changes are visible only when the image has free space or cropping.',
       presets: 'Saved looks', presetName: 'Look name', savePreset: 'Save current appearance', applyPreset: 'Apply', renamePreset: 'Rename', deletePreset: 'Delete look',
       presetHint: 'Save the current palette, image and background controls as a look. Up to 20 looks.', noPresets: 'No saved looks yet.',
       presetNameInvalid: 'Use a unique name of 1–40 characters.',
@@ -79,7 +83,9 @@ window.__ModuleLoader__.load({
         blur: Number.isFinite(v.blur) ? Math.max(0, Math.min(16, v.blur)) : 0,
         fit: ['cover', 'contain', 'repeat'].includes(v.fit) ? v.fit : 'cover',
         image: typeof v.image === 'string' && v.image.length <= 4300000 && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(v.image) ? v.image : '',
-        name: typeof v.name === 'string' ? v.name.slice(0, 200) : '', pattern: v.pattern !== false };
+        name: typeof v.name === 'string' ? v.name.slice(0, 200) : '', pattern: v.pattern !== false,
+        positionX: Number.isFinite(v.positionX) ? Math.round(Math.max(0, Math.min(100, v.positionX))) : 50,
+        positionY: Number.isFinite(v.positionY) ? Math.round(Math.max(0, Math.min(100, v.positionY))) : 50 };
     }
     // Pure persistence scheduler: preview is immediate, storage is coalesced.
     function createSaveQueue(commit, schedule = setTimeout, cancel = clearTimeout) {
@@ -171,10 +177,15 @@ window.__ModuleLoader__.load({
       };
     }
     function backgroundReset() {
-      return { opacity: defaults.opacity, blur: defaults.blur, fit: defaults.fit, pattern: defaults.pattern };
+      return { opacity: defaults.opacity, blur: defaults.blur, fit: defaults.fit, pattern: defaults.pattern, positionX: defaults.positionX, positionY: defaults.positionY };
+    }
+    function imagePlacement(s) {
+      return { backgroundSize: s.fit === 'repeat' ? 'auto 320px' : s.fit,
+        backgroundRepeat: s.fit === 'repeat' ? 'repeat' : 'no-repeat',
+        backgroundPosition: `${s.positionX}% ${s.positionY}%` };
     }
     function layerPresentation(s) {
-      return { visible: s.enabled && Boolean(s.image || s.pattern), opacity: s.opacity / 100, blur: `blur(${s.blur}px)`, imageInset: s.fit === 'contain' ? 0 : -20 };
+      return { visible: s.enabled && Boolean(s.image || s.pattern), opacity: s.opacity / 100, blur: `blur(${s.blur}px)`, imageInset: s.image || s.fit === 'contain' ? 0 : -20 };
     }
     const css = `.ql-panel{max-width:720px;margin:0 auto;padding:24px;color:var(--dsw-alias-label-primary);font-size:14px;line-height:1.6}.ql-panel *{box-sizing:border-box}.ql-panel h2{font-size:22px;margin:0}.ql-muted{color:var(--dsw-alias-label-secondary);font-size:13px}.ql-card{padding:18px;margin:16px 0;border:1px solid var(--dsw-alias-border-l1);border-radius:16px;background:var(--dsw-alias-bg-layer-1)}.ql-row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin:12px 0}.ql-panel button,.ql-panel select,.ql-upload{font:inherit;border:1px solid var(--dsw-alias-border-l2);border-radius:9px;padding:8px 12px;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-2);cursor:pointer}.ql-panel button[aria-pressed=true]{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}.ql-panel :focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:3px}.ql-panel input{accent-color:var(--dsw-alias-brand-primary)}.ql-panel input[type=range]{width:min(240px,100%)}.ql-swatches{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}.ql-theme-choice{min-width:0;text-align:left;display:flex;flex-direction:column;gap:8px}.ql-theme-art{display:flex;width:100%;height:28px;overflow:hidden;border-radius:6px}.ql-theme-art i{flex:1}.ql-theme-label{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px}.ql-theme-check{font-size:11px;color:var(--dsw-alias-label-secondary)}.ql-preview{height:150px;border-radius:12px;margin:12px 0;border:1px solid var(--dsw-alias-border-l1);overflow:hidden;position:relative;background:var(--dsw-alias-bg-base)}.ql-preview span{position:absolute;bottom:10px;left:12px;padding:4px 8px;border-radius:6px;background:var(--dsw-alias-bg-overlay);max-width:90%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ql-error{color:var(--dsw-alias-state-error-primary)}@media(max-width:540px){.ql-panel{padding:14px}.ql-row{align-items:flex-start}}`;
     const panelCss = `
@@ -287,7 +298,7 @@ window.__ModuleLoader__.load({
         function useState() { return React.useSyncExternalStore(subscribe, () => state); }
         function useLocale() { React.useSyncExternalStore(fn => ctx.locale.subscribe(fn), () => ctx.locale.getSnapshot()); }
         function artwork(s) {
-          if (s.image) return { backgroundImage: `url("${s.image}")`, backgroundSize: s.fit === 'repeat' ? 'auto 320px' : s.fit, backgroundRepeat: s.fit === 'repeat' ? 'repeat' : 'no-repeat', backgroundPosition: 'center' };
+          if (s.image) return { backgroundImage: `url("${s.image}")`, ...imagePlacement(s) };
           const colors = palettes[s.palette];
           return { backgroundImage: `radial-gradient(ellipse at 5% 95%, ${colors[6]} 0%, transparent 48%),radial-gradient(ellipse at 90% 80%, ${colors[5]} 0%, transparent 50%)` };
         }
@@ -440,6 +451,13 @@ window.__ModuleLoader__.load({
               h('input', { ref: fileRef, type: 'file', accept: 'image/png,image/jpeg,image/webp', hidden: true, onChange: upload }),
               h('div', { className: 'ql-row' }, button('upload', () => fileRef.current?.click()), button('remove', () => { generation.current++; change({ image: '', name: '' }); }, { disabled: !s.image })),
               range('opacity', 25, '%'), range('blur', 16, 'px'),
+              h('fieldset', { className: 'ql-fields', disabled: !s.image },
+                range('positionX', 100, '%'), range('positionY', 100, '%'),
+                h('div', { className: 'ql-segments' },
+                  button('alignTop', () => change({ positionX: 50, positionY: 0 })),
+                  button('alignCenter', () => change({ positionX: 50, positionY: 50 })),
+                  button('alignBottom', () => change({ positionX: 50, positionY: 100 }))),
+                h('p', { className: 'ql-muted' }, t('positionHint'))),
               h('label', { className: 'ql-row' }, t('fit'), h('select', { value: s.fit, onChange: e => change({ fit: e.target.value }) }, ['cover', 'contain', 'repeat'].map(key => h('option', { key, value: key }, t(key))))),
               h('label', { className: 'ql-row' }, t('pattern'), h('input', { type: 'checkbox', checked: s.pattern, onChange: e => change({ pattern: e.target.checked }) })),
               button('resetParameters', () => change(backgroundReset())),

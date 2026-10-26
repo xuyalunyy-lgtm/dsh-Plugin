@@ -1,5 +1,18 @@
 # 分阶段审查记录
 
+## 位置调整与最终验证：1.5.0
+
+- 独立审查结论：无阻塞项；97/97 测试通过，2026-10-26 恢复工作后再次全量通过。
+- 重点核对：旧 current / preset 缺少 positionX/Y 时按 50 补齐，不在读取时写盘；显式 0/100 保留；Host 严格验证整数范围；方案保存/应用保留位置；参数重置回到中心。
+- 实际图片在可见边界内定位，不再被 overscan 裁掉边缘；预览和全局共用 imagePlacement。
+- 首次安装发现上游命名约束漏测：带连字符的存储域被拒绝。读取实际 bundled UNIT_NAME_RE 确认只允许小写字母、数字、下划线，修正为 local_qinglan_theme，并在 Host 集成测试补齐名称约束。
+- 命名修复经另一次独立审查通过。上游在打开后端前校验名称，因此失败的旧名称没有产生需迁移的域数据。
+- 最终安装 application=applied、version=1.5.0、warnings=[]；实时 settings.section 中 local-qinglan active=true。
+- 实际 qinglan_theme read 成功；故意用不匹配 expectedRevision 的写入被拒绝，前后读均 revision=0、initialized=false，无测试数据写入，保留首次迁移机会。
+- 已检查安装包中英文说明及原创 SVG 图标资源；不等于视觉渲染验收。
+- 仍未验证：真实页面刷新后的全部视觉状态、文件选择和多窗口交互、真实进程重启后的完整读写周期。详见 VERIFICATION.md。
+
+
 ## 命名方案：1.4.0
 
 - 独立审查结论：无阻塞项，90/90 测试通过。

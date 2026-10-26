@@ -4,10 +4,12 @@ const MAX_BYTES = 3 * 1024 * 1024;
 const MAX_BASE64 = 4 * Math.ceil(MAX_BYTES / 3);
 const PALETTES = new Set(['green', 'apricot', 'forest', 'sky', 'lavender', 'rose', 'mint', 'silver', 'midnight', 'plum', 'coffee', 'graphite']);
 const FIELDS = ['enabled', 'palette', 'opacity', 'blur', 'fit', 'name', 'pattern'];
+const POSITION_FIELDS = ['positionX', 'positionY'];
+const normalizeState = state => ({ positionX: 50, positionY: 50, ...state });
 const ID = /^[a-f0-9]{64}$/;
 const PRESET_ID = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
 const MAX_PRESETS = 20;
-export const DEFAULT_STATE = Object.freeze({ enabled: true, palette: 'green', opacity: 12, blur: 0, fit: 'cover', name: '', pattern: true, imageId: null });
+export const DEFAULT_STATE = Object.freeze({ enabled: true, palette: 'green', opacity: 12, blur: 0, fit: 'cover', name: '', pattern: true, imageId: null, positionX: 50, positionY: 50 });
 export const INITIAL_DOCUMENT = Object.freeze({ revision: 0, initialized: false, current: DEFAULT_STATE, presets: Object.freeze([]) });
 
 function invalid(message = 'Invalid theme input') {
@@ -29,6 +31,7 @@ function validField(key, value) {
     case 'palette': return PALETTES.has(value);
     case 'opacity': return Number.isInteger(value) && value >= 0 && value <= 25;
     case 'blur': return Number.isInteger(value) && value >= 0 && value <= 16;
+    case 'positionX': case 'positionY': return Number.isInteger(value) && value >= 0 && value <= 100;
     case 'fit': return ['cover', 'contain', 'repeat'].includes(value);
     case 'name': return typeof value === 'string' && value.length <= 200;
     case 'imageId': return value === null || (typeof value === 'string' && ID.test(value));
@@ -38,7 +41,7 @@ function validField(key, value) {
 function revision(value) { return Number.isSafeInteger(value) && value >= 0; }
 
 function validState(value) {
-  return plain(value, [...FIELDS, 'imageId'], [...FIELDS, 'imageId']) &&
+  return plain(value, [...FIELDS, ...POSITION_FIELDS, 'imageId'], [...FIELDS, 'imageId']) &&
     Object.entries(value).every(([k, v]) => validField(k, v));
 }
 function validPresetName(value) {
@@ -61,7 +64,7 @@ function validPresets(value) {
   }
   return true;
 }
-function clonePresets(presets) { return presets.map(preset => ({ ...preset, state: { ...preset.state } })); }
+function clonePresets(presets) { return presets.map(preset => ({ ...preset, state: normalizeState(preset.state) })); }
 function imageReferences(document) {
   return new Set([document.current.imageId, ...document.presets.map(preset => preset.state.imageId)]);
 }
@@ -126,7 +129,7 @@ function parseRequest(request) {
       }
       return result;
     }
-    if (!Object.hasOwn(request, 'patch') || !plain(request.patch, [...FIELDS, 'image'])) throw invalid('Invalid patch fields');
+    if (!Object.hasOwn(request, 'patch') || !plain(request.patch, [...FIELDS, ...POSITION_FIELDS, 'image'])) throw invalid('Invalid patch fields');
     const patch = {};
     let image;
     for (const [key, value] of Object.entries(request.patch)) {
@@ -160,7 +163,7 @@ export class ThemeRepository {
   #document() {
     const document = this.#domain.global.get();
     if (!validDocument(document)) throw invalid('Invalid persisted theme document');
-    return { ...document, current: { ...document.current }, presets: clonePresets(Object.hasOwn(document, 'presets') ? document.presets : []) };
+    return { ...document, current: normalizeState(document.current), presets: clonePresets(Object.hasOwn(document, 'presets') ? document.presets : []) };
   }
   #snapshot(document) {
     return { revision: document.revision, initialized: document.initialized, state: { ...document.current }, presets: clonePresets(document.presets) };
