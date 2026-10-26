@@ -8,7 +8,7 @@ async function harness() {
   let stored, closed = false, spec;
   const images = new Map();
   const ctx = {
-    storageDomain: { async open(s) { spec = s; stored = structuredClone(s.global.initial); s.global.schema.parse(stored);
+    storageDomain: { async open(s) { assert.match(s.name, /^[a-z][a-z0-9_]*$/); Object.keys(s.tables).forEach(name => assert.match(name, /^[a-z][a-z0-9_]*$/)); spec = s; stored = structuredClone(s.global.initial); s.global.schema.parse(stored);
       return { global: { get:()=>stored, set:async v=>{ s.global.schema.parse(v); stored=structuredClone(v); } },
         table:()=>({get:k=>images.get(k),entries:()=>images.entries(),put:async(k,v)=>{s.tables.images.valueSchema.parse(v);images.set(k,structuredClone(v));},delete:async k=>images.delete(k)}),
         close:async()=>{closed=true;} };
@@ -26,7 +26,7 @@ async function harness() {
 }
 test('registers authenticated Connection routes, real Zod schemas and shared tool', async()=>{
   const x=await harness();
-  assert.equal(x.spec.layout,'per-record'); assert.equal(x.spec.name,'local-qinglan-theme');
+  assert.equal(x.spec.layout,'per-record'); assert.equal(x.spec.name,'local_qinglan_theme');
   assert.equal(x.routes.get('/api/qinglan-theme').requestBody,'streaming');
   const reply=await x.post({action:'read'});
   assert.equal(reply.status,200); assert.equal(reply.body.value.revision,0);

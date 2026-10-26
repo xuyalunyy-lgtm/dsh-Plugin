@@ -5,7 +5,7 @@ import { toolDefinition } from './tool.js';
 export const inject = ['storageDomain', 'connection', 'tools'];
 export async function apply(ctx) {
   const domain = await ctx.storageDomain.open({
-    name: 'local-qinglan-theme', version: 1, layout: 'per-record',
+    name: 'local_qinglan_theme', version: 1, layout: 'per-record',
     global: { schema: z.custom(validDocument), initial: INITIAL_DOCUMENT },
     tables: { images: { valueSchema: z.custom(validImageRecord) } },
   });
