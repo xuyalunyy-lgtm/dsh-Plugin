@@ -81,7 +81,7 @@ test('export snapshots elapsed focus without mutating running segment or double-
   const initial=initialState();initial.tasks=[task('a')];initial.settings.focusMinutes=1;const r=rig(initial);
   await okay(r,{action:'focusStart',id:'a'});r.now+=10000;const first=await okay(r,{action:'export'});
   assert.equal(first.backup.tasks[0].focusMs,10000);assert.equal(first.state.tasks[0].focusMs,0);assert.equal(r.state.focus.segmentStartedAt,BASE);
-  assert.deepEqual(Object.keys(first.backup).sort(),['exportedAt','format','settings','tasks','trash','version']);
+  assert.deepEqual(Object.keys(first.backup).sort(),['exportedAt','format','healthPolicy','settings','tasks','trash','version']);
   r.now+=10000;const second=await okay(r,{action:'export'});assert.equal(second.backup.tasks[0].focusMs,20000);
   r.now=BASE+60000;await okay(r,{action:'read'});assert.equal(r.state.tasks[0].focusMs,60000);assert.equal(r.state.tasks[0].focusRounds,1);await r.close();
 });

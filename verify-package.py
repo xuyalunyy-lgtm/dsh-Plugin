@@ -1,5 +1,5 @@
 """Validate a release tarball and smoke-test its bundled runtime without installation.
-Usage: python verify-package.py artifacts/release/dsh-focus-calendar-1.2.0.tgz --node <node.exe>
+Usage: python verify-package.py artifacts/release/dsh-focus-calendar-1.3.0.tgz --node <node.exe>
 No private planner data is read or written.
 """
 import argparse
@@ -18,7 +18,7 @@ archive = args.archive.resolve(strict=True)
 artifact_root = archive.parent.resolve(strict=True)
 required = {
     'package/package.json', 'package/index.js', 'package/state.js', 'package/client.js',
-    'package/cordis.patch.yml', 'package/icon.svg', 'package/locale/en.json',
+    'package/health-policy.js', 'package/cordis.patch.yml', 'package/icon.svg', 'package/locale/en.json',
     'package/locale/zh.json', 'package/README.md', 'package/RESTORE.md',
     'package/node_modules/zod/package.json', 'package/node_modules/zod/index.js',
     'package/node_modules/zod/LICENSE',
@@ -36,7 +36,12 @@ with tarfile.open(archive, 'r:gz') as tar:
         assert not any(part.startswith('.env') or part.startswith('pre-upgrade-backup') for part in path.parts)
     manifest = json.load(tar.extractfile('package/package.json'))
     assert manifest['name'] == 'dsh-focus-calendar'
-    assert manifest['version'] == '1.2.0'
+    project = json.loads((pathlib.Path(__file__).resolve().parent / 'package.json').read_text(encoding='utf-8'))
+    assert manifest['version'] == project['version'], 'Archive version differs from current source manifest'
+    source_root = pathlib.Path(__file__).resolve().parent
+    for relative in ('index.js', 'state.js', 'health-policy.js', 'client.js', 'cordis.patch.yml',
+                     'icon.svg', 'locale/en.json', 'locale/zh.json', 'README.md', 'RESTORE.md'):
+        assert tar.extractfile('package/' + relative).read() == (source_root / relative).read_bytes(), f'Stale release file: {relative}'
     assert 'zod' in manifest.get('bundledDependencies', [])
     for lang in ('zh', 'en'):
         metadata = json.load(tar.extractfile(f'package/locale/{lang}.json'))['meta']
@@ -66,8 +71,18 @@ const schema = state.stateSchema(z);
 let stored = schema.parse(state.initialState());
 const controller = state.createController({load:()=>stored,save:async next=>{stored=schema.parse(next);}});
 try {
-  const added = await controller.dispatch({action:'add',date:'2026-10-23',title:'Isolated package smoke test'});
+  const addRequest = {action:'add',date:'2026-10-23',title:'Isolated package smoke test',requestId:'package-smoke-request-0001'};
+  const added = await controller.dispatch(addRequest);
   assert.equal(added.ok,true);
+  assert.equal((await controller.dispatch(addRequest)).state.tasks.length,1);
+  const rules = await load('health-policy.js');
+  const policy = rules.validateHealthPolicy();
+  assert.equal(policy.enabled,false);
+  assert.equal((await controller.dispatch({action:'healthPolicy',policy})).ok,true);
+  const quiet = await controller.dispatch({action:'quietStart',minutes:30});
+  assert.equal(quiet.ok,true);
+  assert.equal(quiet.state.healthStatus.allowed,false);
+  assert.equal((await controller.dispatch({action:'quietCancel'})).state.healthStatus.allowed,true);
   const exported = await controller.dispatch({action:'export'});
   assert.equal(exported.ok,true);
   assert.equal(exported.backup.format,'dsh-focus-calendar');
