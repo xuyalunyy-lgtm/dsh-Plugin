@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { findMatches, pdfPageText, intersections, decodeMarkdown } from '../src/search.mjs';
+import { normalizedPdfMetric, buildPageLayout } from '../src/continuous-pdf.mjs';
 
 // Self-contained valid two-page PDF fixture; no user documents or network.
 function twoPagePdf() {
@@ -36,9 +37,10 @@ test('real PDF.js extracts and searches both pages with correct page association
   try {
     const doc = await task.promise;
     assert.equal(doc.numPages, 2);
-    const results = [];
+    const results = [],metrics=[];
     for (let pageNumber = 1; pageNumber <= doc.numPages; pageNumber++) {
       const page = await doc.getPage(pageNumber);
+      metrics.push(normalizedPdfMetric(page.getViewport({scale:1})));
       const content = await page.getTextContent();
       const { text, spans } = pdfPageText(content.items);
       const matches = findMatches(text, 'needle');
@@ -51,6 +53,10 @@ test('real PDF.js extracts and searches both pages with correct page association
       if (pageNumber === 2) assert.equal(findMatches(text, 'needle', true).length, 1);
     }
     assert.deepEqual(results.map(r => r.pageNumber), [1, 2, 2]);
+    assert.deepEqual(metrics,[{width:612,height:792},{width:612,height:792}]);
+    const layout=buildPageLayout(metrics,628);
+    assert.equal(layout.pages[1].top,8+792+12);
+    assert.equal(layout.totalHeight,8+792+12+792+8);
     assert.ok(original.byteLength > 0, 'the shared original buffer stays intact');
   } finally { await task.destroy(); }
 });

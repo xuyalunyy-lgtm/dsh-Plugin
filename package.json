@@ -1,6 +1,6 @@
 {
   "name": "dsh-document-search",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "description": "文档搜索：PDF 与 Markdown 当前文档全文查找、高亮及页码定位",
