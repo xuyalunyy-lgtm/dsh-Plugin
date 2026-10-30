@@ -1,12 +1,11 @@
 # DSH Plugin Collection
 
-本仓库汇总九个 DeepSeek Harness（DSH）插件或桌面修复工具的当前源码快照。每个子目录独立维护；**仓库根目录不是一个可直接安装的 npm 插件包**。
+本仓库汇总八个 DeepSeek Harness（DSH）插件或桌面修复工具的当前源码快照。每个子目录独立维护；**仓库根目录不是一个可直接安装的 npm 插件包**。
 
 ## 插件索引
 
 | 目录 | 当前版本 | 功能 | 使用说明 |
 | --- | --- | --- | --- |
-| `dsh-agent-orchestrator` | 0.3.1 | 结构化任务图、事件驱动多智能体调度、持久任务板及可视化设置 | [README](./dsh-agent-orchestrator/README.md) |
 | `dsh-codex-manager` | 0.4.1 | Codex 现有连接、配额、代理和诊断管理 | [README](./dsh-codex-manager/README.md) |
 | `dsh-codex-subscription` | 0.2.1 | `dsh-llm-codex` 订阅模型适配器 | [README](./dsh-codex-subscription/README.md) |
 | `dsh-desktop-quick-actions` | 0.1.1 | Windows Desktop 重启确认菜单补丁 | [README](./dsh-desktop-quick-actions/README.md) |

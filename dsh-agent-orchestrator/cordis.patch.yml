@@ -1,5 +1,0 @@
-# Plugin bundle: the official plugin manager mounts this row when installing the package.
-# Configuration is saved through Settings → 主控调度 using native volatile Config fields.
-- insert:
-    - id: local-agent-orchestrator
-      name: '@local/dsh-agent-orchestrator'
