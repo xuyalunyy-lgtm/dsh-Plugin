@@ -1,0 +1,15 @@
+{
+  "name": "dsh-git-visualizer",
+  "version": "0.6.0",
+  "description": "DSH Git 工作台：多仓库检索、差异、暂存提交、分支与安全远程同步",
+  "type": "module",
+  "main": "index.js",
+  "exports": {".": "./index.js", "./client": "./client.js", "./package.json": "./package.json", "./cordis.patch.yml": "./cordis.patch.yml"},
+  "files": ["index.js", "client.js", "git-core.mjs", "git-actions.mjs", "git-preview.mjs", "operation-journal.mjs", "repository-discovery.mjs", "cordis.patch.yml", "README.md"],
+  "scripts": {"test": "node --test test/*.test.mjs"},
+  "dsh": {
+    "bundle": {"patch": "./cordis.patch.yml"},
+    "client": {"inject": ["@deepseek-ai/dsh-client-ui-sidebar-right", "@deepseek-ai/dsh-client-ui-session"], "platform": "web"}
+  },
+  "license": "MIT"
+}

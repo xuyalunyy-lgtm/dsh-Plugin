@@ -1,0 +1,14 @@
+# Installed build dependencies
+node_modules/
+
+# Reproducible browser bundle and embedded PDF support assets
+/client.js
+/src/pdf-assets.json
+
+# Local logs, temporary outputs, editor and OS files
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

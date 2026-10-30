@@ -1,0 +1,15 @@
+{
+  "name": "@local/dsh-codex-manager",
+  "version": "0.4.1",
+  "private": true,
+  "description": "Codex 管理中心：管理现有模型连接、代理配置与手动诊断，不新增模型路由。",
+  "type": "module",
+  "exports": { ".": "./index.js", "./client": "./client.js", "./locale/*.json": "./locale/*.json", "./icon": "./icon.svg" },
+  "files": ["index.js", "quota.js", "report.js", "versions.js", "controller.js", "http.js", "client.js", "locale/*.json", "icon.svg", "cordis.patch.yml", "README.md", "LICENSE"],
+  "scripts": { "test": "node --test test/*.test.mjs" },
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": { "platform": "web", "immediately": true, "inject": ["@deepseek-ai/dsh-client-ui-settings"] }
+  },
+  "license": "MIT"
+}

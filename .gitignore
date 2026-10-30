@@ -1,6 +1,60 @@
-node_modules/
-*.tgz
-coverage/
-.env
-.env.*
-*.log
+# Dependencies and caches
+**/node_modules/
+**/.pnpm-store/
+**/.cache/
+**/__pycache__/
+**/coverage/
+
+# Local publish audit is not part of the public repository
+/.publish-audit/
+
+# Local user state, credentials and keys
+**/*.sqlite
+**/*.sqlite3
+**/*.db
+**/.env
+**/.env.*
+!**/.env.example
+**/.dsh/
+**/.codex/
+**/.ssh/
+**/auth.json
+**/credentials.json
+**/settings.local.*
+**/config.local.*
+**/id_ed25519*
+**/id_rsa*
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+
+# Generated archives, logs, screenshots and backups
+**/migration-backups/
+**/backups/
+**/backup/
+**/releases/
+**/artifacts/
+**/screenshots/
+**/logs/
+**/*.tgz
+**/*.asar
+**/*.bak
+**/*.tmp
+**/*.temp
+**/*.log
+
+# Desktop package baseline and prepared replacement archives
+/dsh-desktop-quick-actions/baseline/
+/dsh-desktop-quick-actions/staging/
+
+# Document search bundles are produced by npm run build
+/dsh-document-search/client.js
+/dsh-document-search/src/pdf-assets.json
+
+# Editor and OS state
+**/.vscode/
+**/.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

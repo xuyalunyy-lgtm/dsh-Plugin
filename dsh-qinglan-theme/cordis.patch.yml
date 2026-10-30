@@ -1,0 +1,4 @@
+- insert:
+    - id: local-qinglan-theme
+      name: '@local/dsh-qinglan-theme'
+      config: {}

@@ -1,0 +1,9 @@
+{
+  "name": "dsh-desktop-quick-actions-patch",
+  "version": "0.1.1",
+  "private": true,
+  "type": "module",
+  "description": "Reviewed local Desktop menu patch with safe restart confirmation and rollback",
+  "scripts": { "test": "node --test test/*.test.mjs" },
+  "dependencies": { "@electron/asar": "3.4.1" }
+}
