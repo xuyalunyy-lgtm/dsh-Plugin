@@ -37,7 +37,7 @@ window.__ModuleLoader__.load({
       resetParameters: '重置背景参数（保留图片）', resetAll: '恢复全部默认设置',
       resetWarning: '将恢复青岚配色并清除当前背景。若要保留当前外观，请先保存为方案。',
       confirmReset: '确认恢复并移除图片', cancel: '取消', resetHelp: '仅重置显现度、模糊、铺放、位置和纹理，不改变配色或图片。',
-      rawEmpty: '尚未选择背景图片', version: '版本 1.5.0',
+      rawEmpty: '尚未选择背景图片', version: '版本 1.5.1',
       positionX: '横向位置', positionY: '纵向位置', alignTop: '靠上', alignCenter: '居中', alignBottom: '靠下',
       positionHint: '0% 为左侧 / 顶部，50% 为居中，100% 为右侧 / 底部。只有图片存在可移动或裁切空间时，位置变化才明显。',
       presets: '外观方案', presetName: '方案名称', savePreset: '保存当前外观', applyPreset: '应用', renamePreset: '重命名', deletePreset: '删除方案',
@@ -60,7 +60,7 @@ window.__ModuleLoader__.load({
       resetParameters: 'Reset background controls (keep image)', resetAll: 'Restore all defaults',
       resetWarning: 'This restores the Sage palette and clears the current background. Save a look first if you want to retain this appearance.',
       confirmReset: 'Restore and remove image', cancel: 'Cancel', resetHelp: 'Resets visibility, blur, placement, position and texture only. Keeps your palette and image.',
-      rawEmpty: 'No background image selected', version: 'Version 1.5.0',
+      rawEmpty: 'No background image selected', version: 'Version 1.5.1',
       positionX: 'Horizontal position', positionY: 'Vertical position', alignTop: 'Top', alignCenter: 'Center', alignBottom: 'Bottom',
       positionHint: '0% is left/top, 50% is centered, 100% is right/bottom. Position changes are visible only when the image has free space or cropping.',
       presets: 'Saved looks', presetName: 'Look name', savePreset: 'Save current appearance', applyPreset: 'Apply', renamePreset: 'Rename', deletePreset: 'Delete look',
@@ -75,6 +75,31 @@ window.__ModuleLoader__.load({
       failed: 'Host read/save failed. Check the connection and reload. Wait for saved confirmation before closing.',
       privacy: 'Images and preferences are stored on this Harness Host, not a third party. Authorized pages sharing this Host share appearance. PNG/JPEG/WebP, up to 3 MiB.',
     });
+    // Native Markdown code backgrounds and Shiki colors follow the Host mode,
+    // independently of our palette. Override both sides, not only body text.
+    function markdownTokens(palette) {
+      const colors = palettes[palette];
+      const dark = paletteGroups.darkPalettes.includes(palette);
+      const values = {
+        '--dsw-alias-markdown-inline-code': colors[2],
+        '--dsw-alias-markdown-code-block': colors[1],
+        '--dsw-alias-markdown-code-block-banner': colors[2],
+        '--dsw-alias-markdown-code-segment-selected': colors[2],
+        '--dsw-alias-markdown-code-segment-unselected': colors[1],
+        '--dsw-alias-markdown-citation': colors[2],
+        '--dsw-alias-markdown-tag': colors[2],
+        '--dsw-alias-label-tertiary': colors[8],
+        '--dsw-alias-link': dark ? '#99cdff' : '#155b89',
+        '--shiki-foreground': colors[7],
+        '--shiki-background': colors[1],
+      };
+      const syntax = dark
+        ? ['#8dc7ff', '#8bddae', '#bbc7d4', '#f6acd0', '#ffc38d', '#d7b6ff', '#9cdec1', '#d7dfe9', '#99cdff']
+        : ['#15568b', '#1b673d', '#535f6c', '#923454', '#8a4019', '#593d9e', '#215f40', '#394654', '#155b89'];
+      ['constant', 'string', 'comment', 'keyword', 'parameter', 'function', 'string-expression', 'punctuation', 'link']
+        .forEach((name, index) => { values['--shiki-token-' + name] = syntax[index]; });
+      return Object.fromEntries(Object.entries(values).map(([name, value]) => [name, { light: value, dark: value }]));
+    }
     function sanitize(value) {
       const v = value && typeof value === 'object' ? value : {};
       return { enabled: typeof v.enabled === 'boolean' ? v.enabled : true,
@@ -246,6 +271,7 @@ window.__ModuleLoader__.load({
           for (const [name, value] of Object.entries(surfaces)) {
             tokens[name] = { light: value, dark: value };
           }
+          Object.assign(tokens, markdownTokens(state.palette));
           // Replace the layer atomically; do not briefly expose mixed host colors.
           disposeTokens = ctx.theme.overrideTokens(NS, tokens);
         }
