@@ -26,18 +26,18 @@ window.__ModuleLoader__.load({
     };
     const names = ['bg-base', 'bg-layer-1', 'bg-layer-2', 'bg-overlay', 'border-l1', 'border-l2', 'brand-primary', 'label-primary', 'label-secondary'];
     const dictionaries = {
-      zh: { title: '青岚主题', intro: '柔和配色 · 自定义背景 · 即时预览', enabled: '启用自定义外观', green: '青岚 · 浅绿', apricot: '暖杏 · 米色', forest: '夜森 · 深绿', sky: '晴空 · 浅蓝', lavender: '雾紫 · 薰衣草', rose: '樱雪 · 浅粉', mint: '薄荷 · 青碧', silver: '云银 · 冷灰', midnight: '星海 · 深蓝', plum: '暮紫 · 暗紫', coffee: '摩卡 · 深棕', graphite: '曜石 · 炭灰', lightPalettes: '浅色主题 · 7 套', darkPalettes: '深色主题 · 5 套', selected: '已选中', palette: '主题配色', background: '背景图片', upload: '选择 / 更换背景图', remove: '移除图片', opacity: '背景显现度', blur: '背景模糊', fit: '图片铺放', cover: '铺满（裁切）', contain: '完整显示', repeat: '平铺', pattern: '显示植物光斑纹理', reset: '恢复默认外观', privacy: '图片仅保存在当前浏览器，不上传服务器。支持 PNG / JPEG / WebP，最大 3 MB。背景为不拦截点击的淡化装饰层；显现度越低，文字越清晰。', saved: '已保存到当前浏览器', failed: '本地保存失败，请检查浏览器存储空间或权限。', invalid: '请选择不超过 3 MB 的 PNG、JPEG 或 WebP 图片。', decode: '无法读取此图片，请换一张有效图片。', empty: '默认植物光斑', off: '关闭后恢复 Harness 原有主题；背景设置仍保留。' },
-      en: { title: 'Qinglan Theme', intro: 'Soft palettes · Custom backgrounds · Live preview', enabled: 'Enable custom appearance', green: 'Qinglan · Sage', apricot: 'Warm · Apricot', forest: 'Night · Forest', sky: 'Sky · Blue', lavender: 'Mist · Lavender', rose: 'Blossom · Rose', mint: 'Mint · Teal', silver: 'Cloud · Silver', midnight: 'Midnight · Navy', plum: 'Dusk · Plum', coffee: 'Mocha · Brown', graphite: 'Obsidian · Graphite', lightPalettes: 'Light themes · 7', darkPalettes: 'Dark themes · 5', selected: 'Selected', palette: 'Color palette', background: 'Background image', upload: 'Choose / replace image', remove: 'Remove image', opacity: 'Background visibility', blur: 'Background blur', fit: 'Image placement', cover: 'Cover (crop)', contain: 'Contain', repeat: 'Tile', pattern: 'Botanical light texture', reset: 'Restore defaults', privacy: 'Images stay in this browser and are never uploaded. PNG / JPEG / WebP, up to 3 MB. The faint decorative layer never intercepts clicks; lower visibility improves text readability.', saved: 'Saved in this browser', failed: 'Could not save locally. Check browser storage space or permissions.', invalid: 'Choose a PNG, JPEG or WebP image up to 3 MB.', decode: 'Cannot decode this image. Please choose a valid image.', empty: 'Default botanical texture', off: 'Turning this off restores the original Harness theme and keeps your background preferences.' },
+      zh: { title: '青岚主题', intro: '柔和配色 · 自定义背景 · 即时预览', enabled: '启用自定义外观', green: '青岚 · 浅绿', apricot: '暖杏 · 米色', forest: '夜森 · 深绿', sky: '晴空 · 浅蓝', lavender: '雾紫 · 薰衣草', rose: '樱雪 · 浅粉', mint: '薄荷 · 青碧', silver: '云银 · 冷灰', midnight: '星海 · 深蓝', plum: '暮紫 · 暗紫', coffee: '摩卡 · 深棕', graphite: '曜石 · 炭灰', lightPalettes: '浅色主题 · 7 套', darkPalettes: '深色主题 · 5 套', selected: '已选中', palette: '主题配色', background: '背景图片', upload: '选择 / 更换背景图', remove: '移除图片', opacity: '背景显现度', blur: '背景模糊', fit: '图片铺放', cover: '铺满（裁切）', contain: '完整显示', repeat: '平铺', pattern: '无背景图时显示柔和渐变', reset: '恢复默认外观', privacy: '图片仅保存在当前浏览器，不上传服务器。支持 PNG / JPEG / WebP，最大 3 MB。背景为不拦截点击的淡化装饰层；显现度越低，文字越清晰。', saved: '已保存到当前浏览器', failed: '本地保存失败，请检查浏览器存储空间或权限。', invalid: '请选择不超过 3 MB 的 PNG、JPEG 或 WebP 图片。', decode: '无法读取此图片，请换一张有效图片。', empty: '未选择背景图片', off: '关闭后恢复 Harness 原有主题；背景设置仍保留。' },
+      en: { title: 'Qinglan Theme', intro: 'Soft palettes · Custom backgrounds · Live preview', enabled: 'Enable custom appearance', green: 'Qinglan · Sage', apricot: 'Warm · Apricot', forest: 'Night · Forest', sky: 'Sky · Blue', lavender: 'Mist · Lavender', rose: 'Blossom · Rose', mint: 'Mint · Teal', silver: 'Cloud · Silver', midnight: 'Midnight · Navy', plum: 'Dusk · Plum', coffee: 'Mocha · Brown', graphite: 'Obsidian · Graphite', lightPalettes: 'Light themes · 7', darkPalettes: 'Dark themes · 5', selected: 'Selected', palette: 'Color palette', background: 'Background image', upload: 'Choose / replace image', remove: 'Remove image', opacity: 'Background visibility', blur: 'Background blur', fit: 'Image placement', cover: 'Cover (crop)', contain: 'Contain', repeat: 'Tile', pattern: 'Soft gradient when no image is selected', reset: 'Restore defaults', privacy: 'Images stay in this browser and are never uploaded. PNG / JPEG / WebP, up to 3 MB. The faint decorative layer never intercepts clicks; lower visibility improves text readability.', saved: 'Saved in this browser', failed: 'Could not save locally. Check browser storage space or permissions.', invalid: 'Choose a PNG, JPEG or WebP image up to 3 MB.', decode: 'Cannot decode this image. Please choose a valid image.', empty: 'No background image selected', off: 'Turning this off restores the original Harness theme and keeps your background preferences.' },
     };
     Object.assign(dictionaries.zh, {
       current: '当前配色', previewMode: '预览方式', effect: '实际效果', original: '查看原图',
       sampleTitle: '阅读效果预览', sampleText: '这是一段示例文字，用于检查背景是否影响阅读。',
-      previewHint: '缩略示意：同步显现度、模糊、铺放和纹理；裁切范围随窗口尺寸变化。',
+      previewHint: '缩略示意：同步显现度、模糊、铺放和默认渐变；裁切范围随窗口尺寸变化。',
       inactive: '自定义外观已关闭，当前不会应用背景。', pending: '预览中，停止调整后自动保存…',
       resetParameters: '重置背景参数（保留图片）', resetAll: '恢复全部默认设置',
       resetWarning: '将恢复青岚配色并清除当前背景。若要保留当前外观，请先保存为方案。',
-      confirmReset: '确认恢复并移除图片', cancel: '取消', resetHelp: '仅重置显现度、模糊、铺放、位置和纹理，不改变配色或图片。',
-      rawEmpty: '尚未选择背景图片', version: '版本 1.5.2',
+      confirmReset: '确认恢复并移除图片', cancel: '取消', resetHelp: '仅重置显现度、模糊、铺放、位置和默认渐变，不改变配色或图片。',
+      rawEmpty: '尚未选择背景图片', version: '版本 1.5.3',
       positionX: '横向位置', positionY: '纵向位置', alignTop: '靠上', alignCenter: '居中', alignBottom: '靠下',
       positionHint: '0% 为左侧 / 顶部，50% 为居中，100% 为右侧 / 底部。只有图片存在可移动或裁切空间时，位置变化才明显。',
       presets: '外观方案', presetName: '方案名称', savePreset: '保存当前外观', applyPreset: '应用', renamePreset: '重命名', deletePreset: '删除方案',
@@ -55,12 +55,12 @@ window.__ModuleLoader__.load({
     Object.assign(dictionaries.en, {
       current: 'Current palette', previewMode: 'Preview mode', effect: 'Applied effect', original: 'Original image',
       sampleTitle: 'Readability preview', sampleText: 'Sample text to check whether your background interferes with reading.',
-      previewHint: 'Scaled illustration using the same opacity, blur, placement and texture; cropping depends on window size.',
+      previewHint: 'Scaled illustration using the same opacity, blur, placement and default gradient; cropping depends on window size.',
       inactive: 'Custom appearance is off; no background is applied.', pending: 'Previewing; saves when adjustment stops…',
       resetParameters: 'Reset background controls (keep image)', resetAll: 'Restore all defaults',
       resetWarning: 'This restores the Sage palette and clears the current background. Save a look first if you want to retain this appearance.',
-      confirmReset: 'Restore and remove image', cancel: 'Cancel', resetHelp: 'Resets visibility, blur, placement, position and texture only. Keeps your palette and image.',
-      rawEmpty: 'No background image selected', version: 'Version 1.5.2',
+      confirmReset: 'Restore and remove image', cancel: 'Cancel', resetHelp: 'Resets visibility, blur, placement, position and default gradient only. Keeps your palette and image.',
+      rawEmpty: 'No background image selected', version: 'Version 1.5.3',
       positionX: 'Horizontal position', positionY: 'Vertical position', alignTop: 'Top', alignCenter: 'Center', alignBottom: 'Bottom',
       positionHint: '0% is left/top, 50% is centered, 100% is right/bottom. Position changes are visible only when the image has free space or cropping.',
       presets: 'Saved looks', presetName: 'Look name', savePreset: 'Save current appearance', applyPreset: 'Apply', renamePreset: 'Rename', deletePreset: 'Delete look',
@@ -336,7 +336,7 @@ window.__ModuleLoader__.load({
         function artwork(s) {
           if (s.image) return { backgroundImage: `url("${s.image}")`, ...imagePlacement(s) };
           const colors = palettes[s.palette];
-          return { backgroundImage: `radial-gradient(ellipse at 5% 95%, ${colors[6]} 0%, transparent 48%),radial-gradient(ellipse at 90% 80%, ${colors[5]} 0%, transparent 50%)` };
+          return { backgroundImage: `radial-gradient(ellipse at 5% 95%, ${colors[6]} 0%, transparent 48%),radial-gradient(ellipse at 90% 80%, ${colors[5]} 0%, transparent 50%)`, backgroundRepeat: 'no-repeat', backgroundSize: '100% 100%' };
         }
         // Narrow compatibility rule for the inspected settings navigation contract.
         // No generated class names, wildcard text rules, or changes to error/primary buttons.
@@ -359,8 +359,7 @@ window.__ModuleLoader__.load({
           const presentation = layerPresentation(s);
           if (!presentation.visible) return null;
           return h('div', { 'aria-hidden': true, style: { position: fixed ? 'fixed' : 'absolute', inset: 0, pointerEvents: 'none', userSelect: 'none', overflow: 'hidden', opacity: presentation.opacity } },
-            h('div', { style: { position: 'absolute', inset: presentation.imageInset, ...artwork(s), filter: presentation.blur } }),
-            s.pattern && h('div', { style: { position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle at 10px 10px, var(--dsw-alias-brand-primary) 0 3px, transparent 4px),radial-gradient(circle at 19px 10px, var(--dsw-alias-brand-primary) 0 3px, transparent 4px),radial-gradient(circle at 10px 19px, var(--dsw-alias-brand-primary) 0 3px, transparent 4px),radial-gradient(circle at 19px 19px, var(--dsw-alias-brand-primary) 0 3px, transparent 4px)', backgroundSize: '90px 90px', opacity: .4 } }));
+            h('div', { style: { position: 'absolute', inset: presentation.imageInset, ...artwork(s), filter: presentation.blur } }));
         }
         function Background() {
           const s = useState();
@@ -495,7 +494,7 @@ window.__ModuleLoader__.load({
                   button('alignBottom', () => change({ positionX: 50, positionY: 100 }))),
                 h('p', { className: 'ql-muted' }, t('positionHint'))),
               h('label', { className: 'ql-row' }, t('fit'), h('select', { value: s.fit, onChange: e => change({ fit: e.target.value }) }, ['cover', 'contain', 'repeat'].map(key => h('option', { key, value: key }, t(key))))),
-              h('label', { className: 'ql-row' }, t('pattern'), h('input', { type: 'checkbox', checked: s.pattern, onChange: e => change({ pattern: e.target.checked }) })),
+              h('label', { className: 'ql-row' }, t('pattern'), h('input', { type: 'checkbox', checked: s.pattern, disabled: Boolean(s.image), onChange: e => change({ pattern: e.target.checked }) })),
               button('resetParameters', () => change(backgroundReset())),
               h('p', { className: 'ql-muted' }, t('resetHelp')),
               h('p', { className: 'ql-muted' }, t('privacy')))),
