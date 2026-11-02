@@ -1,5 +1,15 @@
 # 分阶段审查记录
 
+## 聊天气泡 / 输入框：1.5.2（2026-11-02）
+
+- 新截图显示用户气泡与输入框仍浅底浅字，前一 Markdown 修复只解决代码区域，不代表全部聊天控件已适配。
+- 核对 rc.5 精确原生 CSS：用户 bubble 使用 specific-bubble + label-primary；Composer card/input 分别使用 specific-input-major + label-primary；placeholder 为 label-caption；add 使用 selector/hover-solid；send 使用 info-fill/hover + 固定白字。
+- 仅补齐上述已确认使用的八个配色变量，并通过原有 theme.overrideTokens 双模式成对覆盖及 disposer 清理，不改宿主生成类或 DOM。
+- Team 只读复审逐项匹配上述合同，无阻塞项；既有回归 158/158 通过。未新增测试用例，既有数值回归不是真实聊天控件渲染检查。
+- 安装 1.5.2：application=applied、warnings=[]；实时 Client Theme 清单中新增 bubble/input-major/selector/caption/button 等变量，安装包版本已读回为1.5.2。
+- 未更改当前主题、图片、方案或持久化数据。没有浏览器控制，刷新后的气泡/输入框实际视觉仍需用户确认。
+
+
 ## Markdown 深色兼容：1.5.1（2026-11-02）
 
 - 用户截图指出深色主题的行内代码浅底浅字。对照同版本原生 MarkdownText 样式，code 没有独立 color，会继承 label-primary；独立 markdown-inline-code 背景先前未被插件覆盖。

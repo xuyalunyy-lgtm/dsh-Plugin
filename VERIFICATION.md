@@ -1,5 +1,15 @@
 # 验证范围与人工验收清单
 
+## 1.5.2 用户气泡及输入框
+
+- 用户新截图显示 Markdown 行内代码已可读，但用户消息气泡和输入栏仍残留白底，证明 1.5.1 不能代表整个聊天界面验收通过。
+- 对照同版本 ChatUser / Composer 压缩 CSS 确认 specific-bubble、specific-input-major、specific-selector 独立于普通 bg-layer；正文与输入继承 label-primary，占位字用 label-caption，发送图标固定白色。
+- 本轮将这些表面、占位字、添加按钮 hover、光标和发送按钮底色纳入既有双模式覆盖层。
+- 既有 158 项回归通过、语法检查通过。本轮没有新增测试，不声称原有单元测试实际渲染了气泡或输入栏。
+- 安装 1.5.2 为 applied、warnings=[]；实时 Theme 清单中出现 specific-bubble、specific-input-major、selector、caption 和按钮变量，确认新覆盖层运行。
+- 仍需刷新后实际查看用户气泡、输入草稿、占位字、光标、发送按钮正常/悬停/禁用状态；没有浏览器计算样式或屏幕截图验收。
+
+
 ## 1.5.1 Markdown 修复
 
 - 用户截图确认问题：深蓝主题正文为浅色，而 `localStorage` 行内代码底色仍为原生浅色表面。
