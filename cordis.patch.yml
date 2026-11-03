@@ -1,0 +1,7 @@
+- insert:
+    - id: local-codex-break-defense
+      name: '@local/dsh-codex-break-defense'
+      config: {}
+    - id: local-codex-break-defense-reminders
+      name: '@local/dsh-codex-break-defense/reminders'
+      config: {}

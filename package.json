@@ -1,0 +1,34 @@
+{
+  "name": "@local/dsh-codex-break-defense",
+  "version": "1.4.0",
+  "private": true,
+  "description": "codex Break defense：减少无依据的防御性编码、兜底与过度抽象，保留必要的安全和边界检查。",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./reminders": "./reminders.js",
+    "./reminders/locale/*.json": "./reminders/locale/*.json",
+    "./reminders/icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "reminders.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "reminders/locale/*.json",
+    "icon.svg",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "license": "MIT"
+}
