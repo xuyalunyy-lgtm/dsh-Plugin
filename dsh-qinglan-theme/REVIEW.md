@@ -1,5 +1,49 @@
 # 分阶段审查记录
 
+## 侧栏与共享控件：1.5.4（2026-11-03）
+
+- 用户截图中「新会话」使用独立button-elevated-fill浅底，而文字已切浅；侧栏品牌版本徽标另用primary底+primary-inverted字。
+- 读取同版本sidebar/workspace及Button/Pill/Switch/StateDot真实CSS与调用，按实际前景/背景配对覆盖，不增加全局文字规则。
+- 补齐新会话常态/悬停、共享主按钮fill/hover/foreground、toolbar、ghost/Pill激活态、徽标反色；primary hover按远离前景的方向混色。
+- 独立复审识别共享foreground也用于Switch与完成步骤check，已连带配对关闭态thumb与success绿，避免修按钮后引入状态图标低对比；未无依据更改error/warn。
+- 最终复审无阻塞，既有158项测试与diff检查通过。本轮未新增测试，既有测试不直接执行新增按钮token或CSS color-mix。
+- 安装结果1.5.4 application=applied、warnings=[]；实时Theme已出现elevated/primary/toolbar/foreground/inverted/switch等新覆盖变量，确认当前页面执行了新层。
+- 不修改用户已保存的图片、方案或主题状态。仍无浏览器计算样式/截图验收，不能宣称所有原生组件跨平台已视觉通过。
+- 平台范围：当前Windows/Web变量路径；macOS侧栏另有硬编码半透明白色背景分支，本补丁没有覆盖该分支。
+
+
+## 背景去水印化：1.5.3（2026-11-02）
+
+- 用户截图中的四点方块来自 BackgroundLayers 内固定90px平铺装饰层，已删除该层，不只是降低显现度。
+- 保留无图片时的整幅柔和渐变并明确 no-repeat/100%；图片分支仍使用原 imagePlacement，主动选择的图片平铺不受影响。
+- 保留 pattern 偏好字段、所有方案及Host存储结构；其当前用途是无图默认渐变开关。有图片时不叠加装饰，UI开关禁用但不改其值。
+- Team 只读审查无功能阻塞；已同步当前README预览文案，历史版本说明保留原行为描述。
+- 既有158项回归、语法与diff检查通过；未新增测试。测试不是四点图层删除的DOM/截图断言，确认来源为源码审查。
+- 安装1.5.3 application=applied、warnings=[]；安装包版本读回1.5.3，实时shell.overlay仍有active背景注册。
+- 视觉边界：没有浏览器控制，最终页面观感和旧模块是否经刷新替换仍需人工确认；无需重置用户外观或修改已保存方案。
+
+
+## 聊天气泡 / 输入框：1.5.2（2026-11-02）
+
+- 新截图显示用户气泡与输入框仍浅底浅字，前一 Markdown 修复只解决代码区域，不代表全部聊天控件已适配。
+- 核对 rc.5 精确原生 CSS：用户 bubble 使用 specific-bubble + label-primary；Composer card/input 分别使用 specific-input-major + label-primary；placeholder 为 label-caption；add 使用 selector/hover-solid；send 使用 info-fill/hover + 固定白字。
+- 仅补齐上述已确认使用的八个配色变量，并通过原有 theme.overrideTokens 双模式成对覆盖及 disposer 清理，不改宿主生成类或 DOM。
+- Team 只读复审逐项匹配上述合同，无阻塞项；既有回归 158/158 通过。未新增测试用例，既有数值回归不是真实聊天控件渲染检查。
+- 安装 1.5.2：application=applied、warnings=[]；实时 Client Theme 清单中新增 bubble/input-major/selector/caption/button 等变量，安装包版本已读回为1.5.2。
+- 未更改当前主题、图片、方案或持久化数据。没有浏览器控制，刷新后的气泡/输入框实际视觉仍需用户确认。
+
+
+## Markdown 深色兼容：1.5.1（2026-11-02）
+
+- 用户截图指出深色主题的行内代码浅底浅字。对照同版本原生 MarkdownText 样式，code 没有独立 color，会继承 label-primary；独立 markdown-inline-code 背景先前未被插件覆盖。
+- 新增纯 markdownTokens 生成器，行内/代码块/标题栏/分段/标签背景与主要文字配对；链接、行号和 9 类 Shiki 语法 token 按所选主题深浅提供完整 light/dark 覆盖，而非沿用宿主原生模式。
+- Team 独立只读审查：无阻塞项。核对实际控件 CSS 与 ThemeRuntime 同 source 替换/释放合同，未发现颜色层残留或强制全局代码同色问题。
+- 新增 61 项数值/挂接检查，全量 158 项通过；语法与 diff --check 通过。
+- 安装最终 application=applied、version=1.5.1、warnings=[]。实时 Client Theme.listTokens 已出现新增 Markdown/Shiki 变量，证明当前页面执行了新覆盖逻辑，不仅是磁盘版本变更。
+- 没有修改用户已保存的配色、图片、方案或 Host 文档；本轮不存在存储结构升级。
+- 验证边界：对比度针对纯色表面；独立审查和实时 token 注册不等于计算样式/截图验收。当前无浏览器控制，实际截图效果需刷新页面后确认。
+
+
 ## 位置调整与最终验证：1.5.0
 
 - 独立审查结论：无阻塞项；97/97 测试通过，2026-10-26 恢复工作后再次全量通过。
