@@ -6,15 +6,24 @@
 
 | 目录 | 当前版本 | 功能 | 使用说明 |
 | --- | --- | --- | --- |
-| `dsh-codex-manager` | 0.4.1 | Codex 现有连接、配额、代理和诊断管理 | [README](./dsh-codex-manager/README.md) |
+| `dsh-codex-break-defense` | 1.4.0 | Codex 开发约束与防御性冗余提醒 | [README](./dsh-codex-break-defense/README.md) |
+| `dsh-codex-manager` | 0.4.1 | Codex 现有连接、Fast、配额、代理和脱敏诊断管理 | [README](./dsh-codex-manager/README.md) |
 | `dsh-codex-subscription` | 0.2.1 | `dsh-llm-codex` 订阅模型适配器 | [README](./dsh-codex-subscription/README.md) |
 | `dsh-desktop-quick-actions` | 0.1.1 | Windows Desktop 重启确认菜单补丁 | [README](./dsh-desktop-quick-actions/README.md) |
 | `dsh-document-search` | 0.4.0 | 当前 PDF / Markdown 文档全文搜索与定位 | [README](./dsh-document-search/README.md) |
 | `dsh-focus-calendar` | 1.3.0 | 待办、专注计时、健康提醒与备份恢复 | [README](./dsh-focus-calendar/README.md) |
 | `dsh-git-visualizer` | 0.6.0 | Git 多仓库检索、差异、提交、分支及安全同步 | [README](./dsh-git-visualizer/README.md) |
 | `dsh-open-in-app-fix` | 独立脚本 | Windows 在 VS Code 中打开的环境变量修复 | [README](./dsh-open-in-app-fix/README.md) |
-| `dsh-qinglan-theme` | 1.5.0 | 青岚主题、柔和配色与本地背景 | [README](./dsh-qinglan-theme/README.md) |
+| `dsh-qinglan-theme` | 1.5.4 | 青岚主题、柔和配色、本地背景及 Markdown / 侧栏对比度修复 | [README](./dsh-qinglan-theme/README.md) |
 | `dsh-session-manager` | 1.3.0 | 会话跨工作区迁移、多选可恢复归档、空会话识别及工作区隐藏/显示 | [README](./dsh-session-manager/README.md) |
+
+## SSH 同步与当前发布范围
+
+- 仓库地址：[xuyalunyy-lgtm/dsh-Plugin](https://github.com/xuyalunyy-lgtm/dsh-Plugin)；SSH 地址为 `git@github.com:xuyalunyy-lgtm/dsh-Plugin.git`。贡献者页面仅用于浏览，不能作为 Git 推送地址。
+- 2026-11-03 核对了八个独立插件仓库和两个无独立 Git 历史的工具 / 插件目录，合集共保留十个子项目。八个独立仓库的已跟踪源码及在应用中打开修复脚本与合集一致（忽略 LF / CRLF 差异），无需重复覆盖源码；会话管理插件保留已提交快照。
+- 本次仅在既有 `main` 连接 Codex 管理器、Codex 适配器和青岚主题尚未连接的原始提交，并更新根文档；不创建分支、不改写原提交、不强制推送，也不新增 `history/*` 分支。
+- 会话管理插件的本地在途改动按要求暂不发布，索引中的 1.3.0 是当前提交版本，不代表本地未提交草稿的版本。
+- 后续从本合集现有 `main` 正常推送：`git push origin HEAD:refs/heads/main`。不要把各独立仓库的根树依次推到同一个目标 `main`，否则会丢失合集目录结构或产生非快进冲突。
 
 ## 使用与构建
 
@@ -28,7 +37,7 @@
 
 ## 快照与安全边界
 
-- 当前 `main` 按隔离源码快照整理，包含当时可发布的新增和未提交源码，不创建嵌套仓库或 gitlink。七个既有仓库的原始历史通过多父导入提交连接到 `main`，原 commit 与 tag 对象不改写；分支和标签采用 `history/<插件名>/…` 命名空间保留，详见 [历史整合说明](./HISTORY.md)。两个原先没有 Git 历史的目录以当前快照首次导入。历史旧树仍使用原仓库根路径，而非当前插件子目录路径；本地整合完成不等于已经推送。
+- 当前 `main` 按源码快照整理，不创建嵌套仓库或 gitlink。首次整合连接了七个既有仓库的历史；后续加入 Codex Break defense，并将本次核对到的八个独立仓库 HEAD 全部连接到 `main`，原 commit 与 tag 对象不改写。首次整合的引用映射仅是历史记录，不代表这些分支目前仍存在；本次只推送既有 `main`，详见 [历史整合说明](./HISTORY.md)。历史旧树仍使用原仓库根路径，而非当前插件子目录路径；本地整合完成不等于已经推送。
 - 未包含依赖目录、认证文件、SSH 密钥、用户数据、会话数据库、迁移备份、截图、日志、构建缓存、桌面安装归档或发布 tarball。
 - 本地审计目录 `.publish-audit/` 记录源快照、排除项及逐文件 SHA-256，仅供发布前核对，已加入忽略规则，不随仓库公开；其中可能包含开发机路径。审计清单不是测试成功证明。
 - 不要将真实 Token、私钥、带凭据的代理地址或账号配置加入本仓库。测试脚本中的固定假值与代码中的凭据读取逻辑不表示仓库携带真实凭据。

@@ -1,8 +1,34 @@
 # 历史整合说明
 
-本合集将九个插件或桌面工具的可发布源码放入各自子目录。七个项目已有 Git 历史，两个项目原先没有 Git 仓库。
+首次整合将九个插件或桌面工具的可发布源码放入各自子目录：七个项目已有 Git 历史，两个项目原先没有 Git 仓库。后续移除了 `dsh-agent-orchestrator`，加入 `dsh-codex-break-defense` 和 `dsh-session-manager`，当前合集包含十个子项目。以下首次整合数据保留为历史记录，不代表当前分支、标签或目录清单。
 
-## 保留方法
+## 2026-11-03：仅更新既有 main
+
+本次先通过 SSH 获取并快进到远端 `main` 的 `5ac6a16732d52ce95a97b309ac8904e06ba53050`，保留青岚主题 1.5.4 的已有源码更新。核对独立仓库已跟踪文件后，源码与合集一致（忽略 LF / CRLF 差异），因此无需重新复制插件源码。
+
+以下三个源 HEAD 的共六个原始提交尚未从合集 `main` 可达，本次通过保留当前源码树的多父合并连接它们；作者、日期、提交信息及 SHA 均不改写：
+
+| 独立仓库 | 本次连接的原 HEAD | 新增原始提交数 |
+| --- | --- | ---: |
+| `dsh-codex-manager` | `282b87c2d7fcbc7a99b24f325ed8fe9bd88b1d8c` | 1 |
+| `dsh-codex-subscription` | `1e8cbebd918995149a872c796d25c47eba022ed5` | 1 |
+| `dsh-qinglan-theme` | `ef9e467e59e2c42561c8f33a02499f7f0ea84b13` | 4 |
+
+其余五个独立仓库 HEAD 已从 `main` 可达：
+
+| 独立仓库 | 已连接的原 HEAD |
+| --- | --- |
+| `dsh-codex-break-defense` | `20852b1e6e551161ce3e291c03355e9d9fb23175` |
+| `dsh-desktop-quick-actions` | `6490b0f23aa360be871cc36d594c73ebe5337be2` |
+| `dsh-document-search` | `4e95ca57ba6703293ca41e60b4c029872381e725` |
+| `dsh-focus-calendar` | `67c25e8ae9d28ffcae6f21310b9da1454a0f6829` |
+| `dsh-git-visualizer` | `e139c491eddac4389ec4054c03cd8ace7153e198` |
+
+`dsh-open-in-app-fix` 和 `dsh-session-manager` 当前没有独立 Git 仓库；其已发布源码已在合集提交中。会话管理插件正在进行的本地未提交改动按用户选择保留在工作区，不纳入本次发布。
+
+本次不新建本地或远端分支、不推送额外标签、不删除远端既有分支，不强制推送；仅将合集现有 `main` 通过 `git@github.com:xuyalunyy-lgtm/dsh-Plugin.git` 正常快进推送。首次整合时的 `history/*` 映射见下文，仅供追溯，不是当前引用清单。
+
+## 首次整合保留方法
 
 - 七个既有仓库全部引用可达的 **46 个原始提交**作为原对象导入，不 squash、不 filter、不重写作者、日期、提交信息或 commit SHA。
 - 合集 `main` 的首次导入提交使用全部独特引用端点提交作为多个父提交；因此原提交从 `main` 可达，而不是只存在于一个未连接的对象库。
