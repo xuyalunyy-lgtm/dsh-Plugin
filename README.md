@@ -31,6 +31,16 @@
 
 禁用插件会释放配色覆盖和 slot 注册，恢复宿主外观；Host 数据仍保留。所有请求使用 Harness 的认证及 Host/Origin 检查，不另建公开文件服务器。工具 `qinglan_theme` 与 UI 调用同一仓库操作，read 返回 revision，update/reset 使用 expectedRevision。
 
+## 1.5.4 侧栏与共享控件对比度配对
+
+- 修复Windows/Web侧栏「新会话」浅底浅字：独立 elevated 背景和 floating-hover 随主题使用 raised / selected 表面，文字与快捷键仍保留各自主要/次要前景。
+- 按真实原生 Button 合同成对覆盖主按钮 fill/hover/foreground、工具栏 fill/hover、ghost激活态及Pill激活底色，避免Host原生深浅模式拆开配对。
+- 主按钮浅主题用深强调底+白字，深主题用浅强调底+深字；hover朝远离前景的方向混色，不以同色背景吞掉文字。
+- 品牌版本徽标 primary底+inverted文字成对覆盖。共享foreground还用于Switch已开滑块和完成步骤的勾选，连带配对success绿和关闭态滑块，保留状态语义而非全部染成主题色。
+- 不覆盖所有按钮或文字的全局CSS，不改警告/错误颜色，不改用户图片/主题偏好/方案。
+- 已运行既有158项检查并通过独立合同审查；本轮未新增测试，不能把既有回归当作所有原生控件实际可读的截图验收。
+- 范围：当前Windows/Web变量路径。原生macOS新会话按钮还有平台特定硬编码透明材质，不宣称本次已验收该平台。
+
 ## 1.5.3 背景去水印化
 
 - 删除固定 90px 重复的四点方块装饰层，不仅降低其透明度，也不要求用户重置已保存方案。

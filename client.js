@@ -37,7 +37,7 @@ window.__ModuleLoader__.load({
       resetParameters: '重置背景参数（保留图片）', resetAll: '恢复全部默认设置',
       resetWarning: '将恢复青岚配色并清除当前背景。若要保留当前外观，请先保存为方案。',
       confirmReset: '确认恢复并移除图片', cancel: '取消', resetHelp: '仅重置显现度、模糊、铺放、位置和默认渐变，不改变配色或图片。',
-      rawEmpty: '尚未选择背景图片', version: '版本 1.5.3',
+      rawEmpty: '尚未选择背景图片', version: '版本 1.5.4',
       positionX: '横向位置', positionY: '纵向位置', alignTop: '靠上', alignCenter: '居中', alignBottom: '靠下',
       positionHint: '0% 为左侧 / 顶部，50% 为居中，100% 为右侧 / 底部。只有图片存在可移动或裁切空间时，位置变化才明显。',
       presets: '外观方案', presetName: '方案名称', savePreset: '保存当前外观', applyPreset: '应用', renamePreset: '重命名', deletePreset: '删除方案',
@@ -60,7 +60,7 @@ window.__ModuleLoader__.load({
       resetParameters: 'Reset background controls (keep image)', resetAll: 'Restore all defaults',
       resetWarning: 'This restores the Sage palette and clears the current background. Save a look first if you want to retain this appearance.',
       confirmReset: 'Restore and remove image', cancel: 'Cancel', resetHelp: 'Resets visibility, blur, placement, position and default gradient only. Keeps your palette and image.',
-      rawEmpty: 'No background image selected', version: 'Version 1.5.3',
+      rawEmpty: 'No background image selected', version: 'Version 1.5.4',
       positionX: 'Horizontal position', positionY: 'Vertical position', alignTop: 'Top', alignCenter: 'Center', alignBottom: 'Bottom',
       positionHint: '0% is left/top, 50% is centered, 100% is right/bottom. Position changes are visible only when the image has free space or cropping.',
       presets: 'Saved looks', presetName: 'Look name', savePreset: 'Save current appearance', applyPreset: 'Apply', renamePreset: 'Rename', deletePreset: 'Delete look',
@@ -250,6 +250,7 @@ window.__ModuleLoader__.load({
             return;
           }
           const colors = palettes[state.palette];
+          const dark = paletteGroups.darkPalettes.includes(state.palette);
           const tokens = {};
           names.forEach((name, i) => { tokens['--dsw-alias-' + name] = { light: colors[i], dark: colors[i] }; });
           tokens['--dsw-specific-sidebar-fill'] = { light: colors[9], dark: colors[9] };
@@ -267,13 +268,28 @@ window.__ModuleLoader__.load({
             '--dsw-alias-menu-group-header-fill': colors[3],
             '--dsw-menu-surface-fill': colors[3],
             '--dsw-specific-menu': colors[3],
+            // Native controls use separate surface/foreground pairs, not bg-layer-*.
+            '--dsw-alias-button-elevated-fill': colors[1],
+            '--dsw-alias-button-floating-hover': colors[2],
+            '--dsw-alias-button-primary-fill': colors[6],
+            '--dsw-alias-button-primary-hover': `color-mix(in srgb, ${colors[6]} 90%, ${dark ? '#fff' : '#000'})`,
+            '--dsw-alias-label-primary-foreground': dark ? colors[0] : '#ffffff',
+            '--dsw-alias-label-primary-inverted': colors[0],
+            // The same foreground also paints checked switches and done-step icons.
+            '--dsw-alias-switch-thumb': colors[8],
+            '--dsw-alias-state-success-primary': dark ? '#8bddae' : '#1b673d',
+            '--dsw-alias-button-tool-bar-fill': colors[1],
+            '--dsw-alias-button-tool-bar-hover': colors[2],
+            '--dsw-alias-interactive-bg-active': colors[2],
+            '--dsw-alias-button-ghost-active-fill': colors[2],
+            '--dsw-alias-button-ghost-active-border': colors[5],
             // Chat/composer surfaces are independent of bg-layer-* in the Host.
             '--dsw-specific-bubble': colors[2],
             '--dsw-specific-input-major': colors[1],
             '--dsw-specific-selector': colors[2],
             '--dsw-alias-interactive-bg-hover-solid': colors[2],
             '--dsw-alias-label-caption': colors[8],
-            '--dsw-alias-state-business-primary': paletteGroups.darkPalettes.includes(state.palette) ? '#99cdff' : '#155b89',
+            '--dsw-alias-state-business-primary': dark ? '#99cdff' : '#155b89',
             // The native send control has a fixed white icon, even in dark mode.
             '--dsw-alias-button-info-fill': '#315d88',
             '--dsw-alias-button-info-hover': '#26496c',

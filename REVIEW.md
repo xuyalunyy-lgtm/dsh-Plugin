@@ -1,5 +1,17 @@
 # 分阶段审查记录
 
+## 侧栏与共享控件：1.5.4（2026-11-03）
+
+- 用户截图中「新会话」使用独立button-elevated-fill浅底，而文字已切浅；侧栏品牌版本徽标另用primary底+primary-inverted字。
+- 读取同版本sidebar/workspace及Button/Pill/Switch/StateDot真实CSS与调用，按实际前景/背景配对覆盖，不增加全局文字规则。
+- 补齐新会话常态/悬停、共享主按钮fill/hover/foreground、toolbar、ghost/Pill激活态、徽标反色；primary hover按远离前景的方向混色。
+- 独立复审识别共享foreground也用于Switch与完成步骤check，已连带配对关闭态thumb与success绿，避免修按钮后引入状态图标低对比；未无依据更改error/warn。
+- 最终复审无阻塞，既有158项测试与diff检查通过。本轮未新增测试，既有测试不直接执行新增按钮token或CSS color-mix。
+- 安装结果1.5.4 application=applied、warnings=[]；实时Theme已出现elevated/primary/toolbar/foreground/inverted/switch等新覆盖变量，确认当前页面执行了新层。
+- 不修改用户已保存的图片、方案或主题状态。仍无浏览器计算样式/截图验收，不能宣称所有原生组件跨平台已视觉通过。
+- 平台范围：当前Windows/Web变量路径；macOS侧栏另有硬编码半透明白色背景分支，本补丁没有覆盖该分支。
+
+
 ## 背景去水印化：1.5.3（2026-11-02）
 
 - 用户截图中的四点方块来自 BackgroundLayers 内固定90px平铺装饰层，已删除该层，不只是降低显现度。
