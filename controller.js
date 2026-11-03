@@ -3,14 +3,16 @@ import { open } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { queryQuota } from './quota.js';
+import { buildReport, errorSnapshot, quotaSnapshot, testSnapshot } from './report.js';
 
 const ENTRY = 'dsh-llm-codex';
-const EDITABLE = ['proxy', 'clientVersion', 'streamIdleTimeoutMs'];
-const DEFAULTS = { proxy: '', clientVersion: '0.160.1', streamIdleTimeoutMs: 300000 };
+const REQUIRED_SETTINGS = ['proxy', 'clientVersion', 'streamIdleTimeoutMs'];
+const EDITABLE = [...REQUIRED_SETTINGS, 'fastMode'];
+const DEFAULTS = { proxy: '', clientVersion: '0.160.1', streamIdleTimeoutMs: 300000, fastMode: false };
 const MESSAGES = {
   INVALID_REQUEST: '请求参数无效。', ADAPTER_MISSING: '当前 codex 适配器未启用，请在插件页启用现有 dsh-llm-codex。',
   ENTRY_AMBIGUOUS: '需要且只能有一个现有 Codex 适配器配置。', CONFLICT: '配置已被其他页面修改；草稿未覆盖新值，请重新读取后核对。',
-  INVALID_SETTINGS: '代理须为无账号密码的 HTTP(S) 地址；客户端版本和超时须符合范围。',
+  INVALID_SETTINGS: '代理须为无账号密码的 HTTP(S) 地址；客户端版本和超时须符合范围；Fast 必须为布尔值。',
   EXPRESSION_CONFIG: '配置包含动态表达式，管理中心不会覆盖；请使用原插件配置页。',
   BUSY: '已有管理操作进行中，请稍后再试。', CLOSED: '管理插件已停止。',
   MODEL_REQUIRED: '请先刷新目录，并选择其中的模型。', TIMEOUT: '测试超时，请检查代理与服务状态。',
@@ -40,7 +42,8 @@ export function settingsOf(raw) {
   return Object.fromEntries(EDITABLE.map(key => [key, raw[key] ?? DEFAULTS[key]]));
 }
 export function validateSettings(value) {
-  if (!plain(value) || Object.keys(value).length !== EDITABLE.length || EDITABLE.some(k => !Object.hasOwn(value, k))) fail('INVALID_SETTINGS');
+  if (!plain(value) || Object.keys(value).some(k => !EDITABLE.includes(k)) || REQUIRED_SETTINGS.some(k => !Object.hasOwn(value, k))) fail('INVALID_SETTINGS');
+  if (Object.hasOwn(value, 'fastMode') && typeof value.fastMode !== 'boolean') fail('INVALID_SETTINGS');
   const { proxy, clientVersion, streamIdleTimeoutMs } = value;
   if (typeof proxy !== 'string' || proxy.length > 512 || proxy !== proxy.trim()) fail('INVALID_SETTINGS');
   if (proxy) {
@@ -50,7 +53,8 @@ export function validateSettings(value) {
   }
   if (typeof clientVersion !== 'string' || !/^\d{1,4}\.\d{1,4}\.\d{1,4}(?:[-.][a-zA-Z0-9.-]{1,40})?$/.test(clientVersion)) fail('INVALID_SETTINGS');
   if (!Number.isInteger(streamIdleTimeoutMs) || streamIdleTimeoutMs < 5000 || streamIdleTimeoutMs > 600000) fail('INVALID_SETTINGS');
-  return { proxy, clientVersion, streamIdleTimeoutMs };
+  // Omission is intentional: legacy three-field callers must preserve the stored flag.
+  return { proxy, clientVersion, streamIdleTimeoutMs, ...(Object.hasOwn(value, 'fastMode') ? { fastMode: value.fastMode } : {}) };
 }
 /** Read only credential presence/mode. No token, account id, path or raw error leaves this method. */
 export async function readCredential(raw) {
@@ -98,17 +102,26 @@ function safeFailure(error, signal) {
   return { ok: false, code, error: MESSAGES[code] };
 }
 function assertRequest(request) {
-  if (!plain(request) || !['status', 'models', 'saveSettings', 'test', 'quota'].includes(request.action)) fail('INVALID_REQUEST');
+  if (!plain(request) || !['status', 'models', 'saveSettings', 'test', 'quota', 'report'].includes(request.action)) fail('INVALID_REQUEST');
   // Tool schema adapters may materialize every optional property; ignore known
   // fields unused by this action, but never accept unrelated operations/keys.
   const allowed = ['action', 'settings', 'expectedRevision', 'model'];
   if (Object.keys(request).some(k => !allowed.includes(k))) fail('INVALID_REQUEST');
 }
 /** Owns bounded management work, serializes writes/tests, and cancels work on unload. */
-export function createController({ llm, configEditor, summarizeCredential = credentialSummary, quotaQuery = queryQuota }) {
+export function createController({ llm, configEditor, summarizeCredential = credentialSummary, quotaQuery = queryQuota, reportMetadata = () => ({}) }) {
   const lifetime = new AbortController();
   const pending = new Set();
   let busy = false;
+  // Safe snapshots only, scoped to this plugin lifetime; never persist raw errors.
+  const latest = { textTest: null, quota: null, error: null };
+  let observedRevision;
+  function clearSnapshots() { latest.textTest = null; latest.quota = null; latest.error = null; }
+  function observeRevision(raw) {
+    const revision = revisionOf(raw);
+    if (observedRevision !== undefined && observedRevision !== revision) clearSnapshots();
+    observedRevision = revision;
+  }
   function entry() {
     const entries = configEditor.entries().filter(e => e.options.name === ENTRY);
     if (entries.length !== 1) fail('ENTRY_AMBIGUOUS');
@@ -118,6 +131,7 @@ export function createController({ llm, configEditor, summarizeCredential = cred
   function active() { return llm.listProviders().some(p => p.id === 'codex'); }
   async function state() {
     const raw = rawOf(entry());
+    observeRevision(raw);
     if (hasExpression(raw)) fail('EXPRESSION_CONFIG');
     const settings = settingsOf(raw);
     // Never expose a legacy proxy containing credentials or arbitrary raw settings.
@@ -128,6 +142,16 @@ export function createController({ llm, configEditor, summarizeCredential = cred
     assertRequest(request);
     if (lifetime.signal.aborted) fail('CLOSED');
     if (request.action === 'status') return { ok: true, state: await state() };
+    if (request.action === 'report') {
+      let current;
+      let configurationError;
+      try { current = await state(); }
+      catch (error) { configurationError = safeFailure(error).code; }
+      let metadata = {};
+      try { metadata = await reportMetadata(); }
+      catch (error) { /* Optional version metadata must not block a local diagnostic. */ }
+      return { ok: true, report: buildReport({ state: current, metadata, latest, configurationError }) };
+    }
     if (busy) fail('BUSY');
     busy = true;
     const timer = AbortSignal.timeout(request.action === 'test' ? 45000 : 20000);
@@ -143,14 +167,18 @@ export function createController({ llm, configEditor, summarizeCredential = cred
           if (revisionOf(current) !== request.expectedRevision) fail('CONFLICT');
           return { ...current, ...next }; // preserve authFile/writeBack/staticModels and unknown owned fields
         });
+        clearSnapshots();
         return { ok: true, state: await state() };
       }
+      observeRevision(rawOf(entry()));
       if (!active()) fail('ADAPTER_MISSING');
       if (request.action === 'quota') {
         const raw = rawOf(entry());
         if (hasExpression(raw)) fail('EXPRESSION_CONFIG');
         validateSettings(settingsOf(raw));
+        latest.quota = null;
         const quota = await quotaQuery(raw, signal, { readCredential });
+        latest.quota = quotaSnapshot(quota);
         return { ok: true, quota };
       }
       if (request.action === 'models') {
@@ -198,7 +226,17 @@ export function createController({ llm, configEditor, summarizeCredential = cred
     finally { busy = false; }
   }
   function dispatch(request, signal) {
-    const work = operate(request, signal).catch(error => safeFailure(error));
+    const work = operate(request, signal).catch(error => safeFailure(error)).then(result => {
+      if (request?.action !== 'report' && result?.ok === false) {
+        latest.error = errorSnapshot(request?.action, result.code, new Date().toISOString());
+        if (request?.action === 'quota') latest.quota = null;
+      }
+      if (request?.action === 'test' && result?.diagnostic) {
+        latest.textTest = testSnapshot(result.diagnostic);
+        if (!result.diagnostic.ok) latest.error = errorSnapshot('test', result.diagnostic.code, result.diagnostic.finishedAt);
+      }
+      return result;
+    });
     pending.add(work);
     void work.finally(() => pending.delete(work));
     return work;
