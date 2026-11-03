@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "codex Break defense",
+    "description": "Reduce speculative defensive coding: unnecessary fallbacks, duplicate validation, silent error swallowing, and premature abstractions. Preserve necessary security and boundary checks. Toggle in Plugin Manager; applies to models using this profile's standard prompt assembly."
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Reduce redundant safety reminders",
+    "description": "Optional codex Break defense guidance: reduce repeated warnings and keyword-only refusals; support authorized CTF, vulnerability reproduction, and requested PoC scripts. Still flag new risks and required tool approvals; no changes to safety rules, sandbox, or approval policy."
+  }
+}
