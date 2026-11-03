@@ -1,6 +1,6 @@
 # dsh-llm-codex
 
-> 📦 已发布到 npm:[dsh-llm-codex](https://www.npmjs.com/package/dsh-llm-codex)(当前仓库版本 0.2.0)
+> 📦 已发布到 npm:[dsh-llm-codex](https://www.npmjs.com/package/dsh-llm-codex)(本地开发版本 0.2.1，未发布)
 > · 📚 GitHub:[yequ172672/dsh-codex-subscription](https://github.com/yequ172672/dsh-codex-subscription)
 > · 🏷️ 属于 [dsh-plugin](https://github.com/topics/dsh-plugin) 插件话题
 
@@ -66,6 +66,14 @@ Codex CLI(`codex login`)会把 ChatGPT 订阅的 OAuth 令牌写入 `~/.codex/au
   "No tool output found for function call"(400)拒绝整轮请求。
 - **多模态**:用户上传的图片按附件 id 读取,编码成 `input_image` + `data:` URL 发送;
   目录里 `input_modalities` 含 `image` 的模型(2026-10 目录 9 个模型全部支持)可直接看图。
+
+## Fast 模式（默认关闭）
+
+新增可选布尔配置 `fastMode`，默认 `false`。仅显式设为 `true` 时，后续模型请求体发送 `service_tier: "priority"`；关闭或省略时完全不发送该字段，保持旧行为（不会强制发送 `"default"`）。该设置为当前适配器级别，影响其后续所有模型请求，不改变模型 ID、推理等级或提示词；不是降低思考量的快捷方式。加载新版后，修改此 volatile 配置无需重新注册适配器。
+
+协议证据：[OpenAI 官方 Codex 源码，固定提交 a3697361](https://github.com/openai/codex/blob/a3697361dfc0bc438b65ae8a9aa0e598ecd45251/codex-rs/protocol/src/config_types.rs) 中 `ServiceTier::Fast.request_value()` 返回 `"priority"`；[官方请求实现](https://github.com/openai/codex/blob/a3697361dfc0bc438b65ae8a9aa0e598ecd45251/codex-rs/core/src/client.rs) 将 `service_tier` 传入 Responses 请求。
+
+**限制与费用：**配置开启只表示请求优先服务，不保证每个模型、账号、订阅计划或 API 项目都支持，也不保证一定提速。可能加快额度消耗或产生较高 API 费用，以服务端当前规则为准；本插件不硬编码易过期的支持名单或费率。服务端若返回不支持错误，按原错误返回，不静默降级或为了 Fast 额外重试；请手动关闭。ChatGPT 订阅与 API Key 两条既有请求路径均会携带此配置。更换插件代码后需重启 DSH 加载新模块；本地离线测试仅验证请求字段，不代表真实账号已获得 Fast 权限。
 
 ## 目录结构
 
