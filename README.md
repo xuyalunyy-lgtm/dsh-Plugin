@@ -1,6 +1,6 @@
 # DSH Plugin Collection
 
-本仓库汇总八个 DeepSeek Harness（DSH）插件或桌面修复工具的当前源码快照。每个子目录独立维护；**仓库根目录不是一个可直接安装的 npm 插件包**。
+本仓库汇总多个 DeepSeek Harness（DSH）插件或桌面修复工具的当前源码快照。每个子目录独立维护；**仓库根目录不是一个可直接安装的 npm 插件包**。
 
 ## 插件索引
 
@@ -14,6 +14,7 @@
 | `dsh-git-visualizer` | 0.6.0 | Git 多仓库检索、差异、提交、分支及安全同步 | [README](./dsh-git-visualizer/README.md) |
 | `dsh-open-in-app-fix` | 独立脚本 | Windows 在 VS Code 中打开的环境变量修复 | [README](./dsh-open-in-app-fix/README.md) |
 | `dsh-qinglan-theme` | 1.5.0 | 青岚主题、柔和配色与本地背景 | [README](./dsh-qinglan-theme/README.md) |
+| `dsh-session-manager` | 1.3.0 | 会话跨工作区迁移、多选可恢复归档、空会话识别及工作区隐藏/显示 | [README](./dsh-session-manager/README.md) |
 
 ## 使用与构建
 

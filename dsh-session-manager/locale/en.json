@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Session Manager",
+    "description": "Multi-select and archive sessions, identify empty conversations, create, migrate and restore. Bulk actions validate each item with individual results. Workspace visibility affects this page only; migration preserves history without taking over old tasks."
+  }
+}
