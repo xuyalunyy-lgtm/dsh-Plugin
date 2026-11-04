@@ -20,7 +20,7 @@ window.__ModuleLoader__.load({
       page:'本页', total:'总数', archivedHint:'包含系统已有的归档会话；不会自动永久清理。', unavailable:'运行中会话请先结束任务，再移动或删除。',
       completedOpen:'打开新会话', refreshFirst:'列表已刷新。请核对最新状态后重新操作。', from:'源会话',
       batchDelete:'删除所选', confirmBatchDelete:'确认批量删除', selected:'已选择', selectAllPage:'全选本页', selectEmptyPage:'选择本页空会话', clearSelection:'清空选择', selectSession:'选择会话', emptySession:'空会话', batchHint:'只操作本页勾选项；切换筛选、翻页或刷新会清空选择。', batchDeleteNote:'所选会话将逐个移入可恢复归档，不会永久擦除日志。运行中或状态变化的项目会跳过，并列出失败原因。', batchResults:'逐项结果', batchSucceeded:'已归档', batchFailed:'未删除',
-      workspaceVisibility:'工作区可见性', visibilityHint:'点击眼睛切换。仅隐藏本页的工作区和会话，不影响左侧原生列表、归档或任务运行；设置在本机各会话共享。', hideWorkspace:'隐藏工作区', showWorkspace:'显示工作区', workspaceVisible:'已显示', workspaceHidden:'已隐藏', showHidden:'显示已隐藏的会话', visibilityUnavailable:'请刷新后重试可见性设置', visibleCount:'显示中',
+      workspaceVisibility:'工作区可见性', visibilityHint:'点击眼睛隐藏/显示本页的工作区和会话；此处保留恢复入口。不影响原生侧栏，不会归档、删除或停止任务。', hideWorkspace:'隐藏工作区', showWorkspace:'显示工作区', workspaceVisible:'已显示', workspaceHidden:'已隐藏', showHidden:'显示已隐藏的会话', visibilityUnavailable:'请刷新后重试可见性设置', visibleCount:'显示中',
     };
     const en = {
       title:'Session Manager', subtitle:'Organize conversations. Continue in the right workspace.', back:'Back to chat', refresh:'Refresh', create:'New session',
@@ -39,7 +39,7 @@ window.__ModuleLoader__.load({
       page:'On this page', total:'Total', archivedHint:'Includes sessions already archived by DSH. No automatic permanent removal.', unavailable:'Finish running work before moving or deleting a session.',
       completedOpen:'Open new session', refreshFirst:'The list was refreshed. Review the latest state and try again.', from:'Source session',
       batchDelete:'Delete selected', confirmBatchDelete:'Confirm bulk deletion', selected:'Selected', selectAllPage:'Select this page', selectEmptyPage:'Select empty on this page', clearSelection:'Clear selection', selectSession:'Select session', emptySession:'Empty session', batchHint:'Only checked rows on this page are affected. Filters, page changes and refresh clear the selection.', batchDeleteNote:'Selected sessions are archived individually and remain recoverable. Running or changed sessions are skipped with an individual failure reason. Logs are not permanently erased.', batchResults:'Individual results', batchSucceeded:'Archived', batchFailed:'Not deleted',
-      workspaceVisibility:'Workspace visibility', visibilityHint:'Click an eye to switch. Hides workspaces and sessions on this page only, without changing the native sidebar, archives or running work. Saved locally and shared across sessions.', hideWorkspace:'Hide workspace', showWorkspace:'Show workspace', workspaceVisible:'Visible', workspaceHidden:'Hidden', showHidden:'Show hidden sessions', visibilityUnavailable:'Refresh before changing visibility', visibleCount:'Visible',
+      workspaceVisibility:'Workspace visibility', visibilityHint:'Click an eye to hide/show workspaces and their sessions on this page. Recovery controls stay here. The native sidebar is unchanged. No archival, deletion or task cancellation.', hideWorkspace:'Hide workspace', showWorkspace:'Show workspace', workspaceVisible:'Visible', workspaceHidden:'Hidden', showHidden:'Show hidden sessions', visibilityUnavailable:'Refresh before changing visibility', visibleCount:'Visible',
     };
     const css = `
 .sm{height:100%;overflow:auto;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-base);font:inherit;font-size:14px;line-height:1.5;padding:24px clamp(16px,3vw,40px)}
@@ -68,6 +68,23 @@ window.__ModuleLoader__.load({
         ctx.effect(()=>ctx.locale.register('session-manager','zh',zh));
         ctx.effect(()=>ctx.locale.register('session-manager','en',en));
         const t=ctx.locale.bind('session-manager');
+        let visibilitySnapshot={ready:false,revision:-1,hiddenWorkspaceIds:[],error:false};
+        const visibilityListeners=new Set();
+        const visibility={getSnapshot:()=>visibilitySnapshot,subscribe:fn=>{visibilityListeners.add(fn);return()=>visibilityListeners.delete(fn);}};
+        const publishVisibility=value=>{visibilitySnapshot=value;visibilityListeners.forEach(fn=>fn());};
+        ctx.effect(()=>{
+          const source=new EventSource(new URL('./session-manager/visibility',document.baseURI),{withCredentials:true});
+          source.onmessage=event=>{
+            try {
+              const value=JSON.parse(event.data);
+              if(!Number.isSafeInteger(value.revision)||value.revision<0||!Array.isArray(value.hiddenWorkspaceIds)||!value.hiddenWorkspaceIds.every(id=>typeof id==='string'))throw Error('Invalid workspace visibility snapshot');
+              if(value.revision<visibilitySnapshot.revision)return;
+              publishVisibility({...value,ready:true,error:false});
+            }catch(error){console.error('Workspace visibility stream:',error);publishVisibility({...visibilitySnapshot,error:true});}
+          };
+          source.onerror=()=>publishVisibility({...visibilitySnapshot,error:true});
+          return()=>{source.onmessage=null;source.onerror=null;source.close();};
+        });
         const journalKey='dsh-session-manager.pending.v1';
         let pending=null;
         try { const saved=JSON.parse(sessionStorage.getItem(journalKey)||'null'); if(saved&&typeof saved.requestId==='string'&&['create','move','delete','restore','setWorkspaceVisibility','batchDelete'].includes(saved.action))pending=saved; } catch {}
@@ -114,6 +131,7 @@ window.__ModuleLoader__.load({
         function Page() {
           React.useSyncExternalStore(ctx.locale.subscribe.bind(ctx.locale),ctx.locale.getSnapshot.bind(ctx.locale));
           React.useSyncExternalStore(subscribe,()=>revision);
+          const liveVisibility=React.useSyncExternalStore(visibility.subscribe,visibility.getSnapshot);
           const [data,setData]=React.useState({workspaces:[],items:[],total:0});
           const [visibilityExpanded,setVisibilityExpanded]=React.useState(true);
           const [selected,setSelected]=React.useState({});
@@ -129,7 +147,7 @@ window.__ModuleLoader__.load({
               setData(value);setLoading(false);
             }).catch(error=>{if(!abort.signal.aborted&&current===serial.current){setReadError(error.message);setLoading(false);}});},query?220:0);
             return()=>{clearTimeout(timer);abort.abort();};
-          },[query,filter,archived,includeHidden,offset,refresh,completedRevision]);
+          },[query,filter,archived,includeHidden,offset,refresh,completedRevision,liveVisibility.revision]);
           const open=id=>ctx.uiWorkspace.openSession(id);
           async function execute(request) {
             if(inFlight)return;inFlight=true;publish();setBusy(true);

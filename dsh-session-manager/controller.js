@@ -132,6 +132,26 @@ export function createController(ctx, receipts, { now = Date.now, visibility } =
   let uncertainVisibility;
   let pendingBatch = [...(receipts.entries?.() ?? [])].find(([, receipt]) => receipt.request?.action === 'batchDelete' && receipt.stage !== 'done')?.[0];
   const visibilityState = () => visibility?.get() ?? { revision: 0, hiddenWorkspaceIds: [], receipts: [] };
+  const visibilityListeners = new Set();
+  function readVisibility() {
+    const state = visibilityState();
+    return { revision: state.revision, hiddenWorkspaceIds: [...state.hiddenWorkspaceIds] };
+  }
+  function subscribeVisibility(listener) {
+    if (closing) throw new Error('会话管理服务正在关闭');
+    visibilityListeners.add(listener);
+    return () => visibilityListeners.delete(listener);
+  }
+  function publishVisibility() {
+    const snapshot = readVisibility();
+    for (const listener of [...visibilityListeners]) {
+      try { listener(clone(snapshot)); }
+      catch (error) {
+        visibilityListeners.delete(listener);
+        ctx.logger?.warn(`session-manager: visibility subscriber failed: ${clean(error?.message || error)}`);
+      }
+    }
+  }
   const workspaceViews = state => {
     const hidden = new Set(state.hiddenWorkspaceIds);
     return ctx.workspaceRegistry.list().map(({ id, title, path }) => ({ id, title, path, hidden: hidden.has(id) }));
@@ -426,6 +446,7 @@ export function createController(ctx, receipts, { now = Date.now, visibility } =
     if (receipt) {
       if (receipt.fingerprint !== fingerprint) fail('REQUEST_ID_REUSED', '同一个 requestId 不能用于不同参数。');
       if (uncertainVisibility?.requestId === request.requestId) uncertainVisibility = undefined;
+      publishVisibility();
       return clone(receipt.result);
     }
     if (uncertainVisibility && (uncertainVisibility.requestId !== request.requestId || uncertainVisibility.fingerprint !== fingerprint)) fail('PENDING', '前一次显示设置写入结果待确认；请先使用其原请求凭证重试。');
@@ -443,7 +464,7 @@ export function createController(ctx, receipts, { now = Date.now, visibility } =
     // Keep receipts compact and independent of directory count. The caller
     // refreshes list for current workspaces; exact replay returns this same
     // historical acknowledgement without duplicating all paths per request.
-    const result = { ok: true, visibilityRevision: next.revision, message: request.hidden ? '已在会话管理页隐藏此工作区；不影响原生侧栏、会话归档或运行。' : '已在会话管理页显示此工作区；不影响原生侧栏、会话归档或运行。' };
+    const result = { ok: true, visibilityRevision: next.revision, message: request.hidden ? '已在会话管理页隐藏此工作区及其会话；不影响原生侧栏，未归档或停止任务。' : '已在会话管理页显示此工作区及其会话；不影响原生侧栏，未改变归档或运行状态。' };
     next.receipts = [...state.receipts, { requestId: request.requestId, fingerprint, result }];
     // One domain-global atomic barrier commits both absolute visibility and its
     // receipt. A retry can never overwrite a later revision: receipt lookup is
@@ -454,6 +475,7 @@ export function createController(ctx, receipts, { now = Date.now, visibility } =
       fail('WRITE_UNCERTAIN', '显示设置写入结果待确认；只能使用原 requestId 和完全相同参数重试。');
     }
     uncertainVisibility = undefined;
+    publishVisibility();
     return result;
   }
   async function batchDelete(request) {
@@ -571,7 +593,7 @@ export function createController(ctx, receipts, { now = Date.now, visibility } =
     inFlight.add(pending);
     return pending;
   }
-  return { dispatch, async close() { closing = true; await Promise.allSettled(inFlight); } };
+  return { dispatch, readVisibility, subscribeVisibility, async close() { closing = true; await Promise.allSettled(inFlight); visibilityListeners.clear(); } };
 }
 
 export function visibilitySchema(z) {
