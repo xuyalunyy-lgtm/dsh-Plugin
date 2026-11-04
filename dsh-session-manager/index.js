@@ -16,7 +16,7 @@ export const parameters = {
     query: { type: 'string', description: '仅 list：按标题、会话 ID、工作目录搜索，最多 500 字符。' },
     archived: { type: 'boolean', description: '仅 list：false（默认）列出未归档，true 列出可恢复归档。' },
     includeHidden: { type: 'boolean', description: '仅 list：true 包含隐藏工作区中的会话；默认 false，显式 workspaceId 不绕过隐藏。workspaces 始终返回全部及 hidden 标记。' },
-    hidden: { type: 'boolean', description: '仅 setWorkspaceVisibility 必填：true 隐藏、false 显示，仅影响会话管理页，不影响原生侧栏。' },
+    hidden: { type: 'boolean', description: '仅 setWorkspaceVisibility 必填：true 隐藏、false 显示，影响会话管理页及启用的独立侧栏浏览器，不修改原生侧栏数据。' },
     expectedVisibilityRevision: { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER, description: '仅 setWorkspaceVisibility 必填：读取 list 返回的 visibilityRevision；CONFLICT 后刷新核对。' },
     offset: { type: 'integer', minimum: 0, maximum: 1000000, description: '仅 list：零起始分页偏移，默认 0。' },
     limit: { type: 'integer', minimum: 1, maximum: 200, description: '仅 list：每页数量，默认 50。' },
@@ -61,7 +61,7 @@ export async function apply(ctx) {
   ctx.effect(() => ctx.webServer.register({ kind: 'exact', path: '/session-manager/visibility', handler: visibilityStream.handler }));
   ctx.effect(() => ctx.tools.register({
     name: 'session_manager',
-    description: '管理与会话管理页共享的会话及工作区显示设置。移动完整历史至新 ID 并归档源；删除仅可恢复归档。隐藏工作区仅过滤会话管理页，不影响原生侧栏，不改变会话归档、访问权限、模型或任务运行。返回分页列表（empty 为保守内容判定）、状态凭证及显示版本。batchDelete 逐项安全检查并返回成功/失败清单，全部结算时 ok:true；结果待确认须原批量请求重试。可保留目标、提醒、团队和子智能体历史；迁移不接管旧团队/子智能体或提醒，目标需明确恢复才继续。实际活动及排队输入仍拒绝迁移。',
+    description: '管理与会话管理页共享的会话及工作区显示设置。移动完整历史至新 ID 并归档源；删除仅可恢复归档。隐藏工作区过滤会话管理页及启用的独立侧栏浏览器，不修改原生侧栏数据，不改变会话归档、访问权限、模型或任务运行。返回分页列表（empty 为保守内容判定）、状态凭证及显示版本。batchDelete 逐项安全检查并返回成功/失败清单，全部结算时 ok:true；结果待确认须原批量请求重试。可保留目标、提醒、团队和子智能体历史；迁移不接管旧团队/子智能体或提醒，目标需明确恢复才继续。实际活动及排队输入仍拒绝迁移。',
     parameters,
     output: {
       schema: { type: 'object', required: ['ok'], additionalProperties: true, properties: { ok: { type: 'boolean' }, code: { type: 'string' }, error: { type: 'string' }, sessionId: { type: 'string' }, sourceSessionId: { type: 'string' }, message: { type: 'string' }, visibilityRevision: { type: 'integer' }, succeeded: { type: 'integer' }, failed: { type: 'integer' }, results: { type: 'array', items: { type:'object', additionalProperties:true } }, total: { type: 'integer' }, offset: { type: 'integer' }, limit: { type: 'integer' }, items: { type: 'array', items: { type: 'object', additionalProperties: true } }, workspaces: { type: 'array', items: { type: 'object', additionalProperties: true } } } },
