@@ -1,0 +1,10 @@
+{
+  "name": "@local/dsh-embedded-preset",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "嵌入式软件开发 Agent 预设：简洁实现、有效验证、明确疑问、严格控制任务范围。",
+  "exports": { "./locale/*.json": "./locale/*.json", "./icon": "./icon.svg" },
+  "files": ["cordis.patch.yml", "locale/*.json", "icon.svg"],
+  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
+}

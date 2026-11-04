@@ -116,12 +116,13 @@ export function apply(ctx, config) {
   // 先求值一次:配置非法时在装载期立刻失败(loud fail)
   options();
 
-  // 传输对象按代理地址缓存;代理配置变化时自动重建
+  // Each request resolves the actual local proxy before reusing its transport.
   let transportCache = { key: undefined, promise: undefined };
-  const getTransport = () => {
-    const key = resolveProxyUrl(options()) ?? '';
+  const getTransport = async () => {
+    const current = options();
+    const key = (await resolveProxyUrl(current)) ?? '';
     if (transportCache.promise === undefined || transportCache.key !== key) {
-      transportCache = { key, promise: createTransport(options()) };
+      transportCache = { key, promise: createTransport(current, key) };
     }
     return transportCache.promise;
   };

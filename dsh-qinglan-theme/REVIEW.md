@@ -1,5 +1,19 @@
 # 分阶段审查记录
 
+## 表单与原生控件：1.5.5（2026-11-04）
+
+- 用户子智能体设置截图：数值输入使用 fields 的第三层背景，保存文字也使用第三层作反色前景；此前仅覆盖前两层，导致白底浅字和保存文字拆对。
+- 已核对精确rc5 SettingsForm、fields、Input、Tag、SegmentedTabs、Checkbox、Switch及子智能体真实调用；补齐bg-layer-3=raised、bg-layer-4=selected、label-dimmed=secondary。
+- 模型候选使用裸checkbox，由浏览器绘制。当前layout文档确认html由presenter写入color-scheme；插件只在body显式设置所选palette的scheme及brand accent，覆盖继承而不抢写html或宿主偏好。
+- 样式沿用Background现有启用与卸载路径，不依赖背景图或渐变开关；关闭后恢复宿主继承，不使用!important或全局文字色。
+- 独立复审无阻塞，既有158项检查通过；语法和diff检查通过。没有新增测试，既有检查未执行body层叠、原生checkbox绘制或保存交互。
+- 保存按钮原有禁用条件、opacity .4、校验和写入逻辑未改；禁用状态灰淡不等于需要强制启用。
+- 安装结果1.5.5 application=applied、warnings=[]；实时Theme出现bg-layer-3/-4和label-dimmed，确认新增token覆盖已运行。部署时没有浏览器计算样式或自动截图验收证据。
+- 收尾复核：代码提交43bb0bd的配色映射、body样式继承、启用/关闭/卸载路径及变更范围未发现阻塞问题；本轮没有功能变更，复用同一代码此前独立审查及158项通过结果，不重复运行测试。
+- 2026-11-04用户反馈“效果没有问题”，记录为当前实际查看界面的人工视觉确认；不据此推断所有配色、交互状态或平台已验收。
+- 未修改用户已保存的主题、图片或方案；html自身画布/视口滚动条和显式自有scheme的后代不在body规则保证范围内。
+
+
 ## 侧栏与共享控件：1.5.4（2026-11-03）
 
 - 用户截图中「新会话」使用独立button-elevated-fill浅底，而文字已切浅；侧栏品牌版本徽标另用primary底+primary-inverted字。

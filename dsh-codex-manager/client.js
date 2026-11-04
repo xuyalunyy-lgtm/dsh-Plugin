@@ -19,7 +19,17 @@ window.__ModuleLoader__.load({
         present: '已发现', missing: '未找到', invalid: '无效', unavailable: '暂不可读取',
         unknown: '未知', mode: '认证方式', chatgpt: 'ChatGPT 订阅', apikey: 'API Key',
         checkedAt: '检查时间', notChecked: '尚未检查', privacy: '此页面不展示令牌或凭证文件路径；不会切换账户或修改默认模型。',
-        settings: '接入设置', proxy: '代理地址', proxyHint: '留空使用适配器原有的环境代理或直连行为。不要在代理地址中填写用户名或密码。',
+        settings: '接入设置', proxy: '固定代理地址', proxyHint: '固定地址优先于环境变量和系统设置，不会跟随系统端口变化。仅接受不含账号密码的 HTTP(S) 地址。',
+        proxyMode: '代理模式', proxyAutomatic: '自动跟随', proxyManual: '固定地址', proxySavedMode: '已保存模式', proxyDraftMode: '草稿模式（未保存）',
+        proxyAutoHint: '自动模式依次读取环境代理、Windows 已启用的静态系统代理，没有来源时直连；需要适配器 0.2.2+，升级后完整重启 DSH。保存此模式不会固定检测到的端口。',
+        proxyCandidate: '当前自动代理候选', proxyEnvironment: '环境变量', proxyWindows: 'Windows 系统设置', proxyUseCandidate: '将候选用于固定地址',
+        proxyDetectionHint: '本地设置快照，不代表已连通；NO_PROXY 命中目标时仍会直连。点击“刷新状态”重新读取。',
+        proxyNotDetected: '未启用静态系统代理，自动模式将直连；如需代理，请先在系统中启用或使用固定地址。不支持 PAC。',
+        proxyDetectionInvalid: '自动代理设置无效或不适合在此显示，请检查环境变量/系统设置；不会悄悄改用另一来源。',
+        proxyDetectionUnavailable: '无法读取本地代理设置。请检查系统设置或使用固定地址。',
+        proxyDetectionUnsupported: '当前平台未检测到支持的自动代理来源。非 Windows 平台将直连；不支持 PAC。',
+        proxyDetectionUnknown: '尚未获取自动代理状态，请刷新状态；不要据此判断已经直连或连接成功。',
+        proxyTroubleshoot: '请核对已保存的代理模式、代理软件是否运行，以及 NO_PROXY 是否绕过 ChatGPT。修改草稿不会立即生效；保存后可刷新额度验证，不必反复执行模型测试。',
         clientVersion: '客户端协议版本', streamIdleTimeoutMs: '流空闲超时（毫秒）',
         timeoutHint: '控制模型流多久没有新数据时中止，不是整轮生成的总时限。',
         fastMode: 'Fast：申请优先处理',
@@ -65,7 +75,7 @@ window.__ModuleLoader__.load({
         helpCredential: '凭证存在不代表登录有效：本地文件可读不等于服务端接受令牌；需要时先在 Codex CLI 或桌面端重新登录。',
         helpCatalog: '目录可见不代表模型可调用：目录可能来自缓存；只有主动连接测试才会发起真实模型请求。',
         helpQuota: '额度百分比不是剩余 token 数，也不是当前会话的上下文余量。额度查询失败不代表模型不可用，两者是不同接口。',
-        helpSettings: '设置含义', helpProxy: '代理决定适配器如何访问服务。留空沿用环境代理或直连；请勿在地址中填写账号密码。',
+        helpSettings: '设置含义', helpProxy: '手动保存的代理优先；留空时新版适配器自动读取环境变量和 Windows 已启用系统代理，均没有时才直连。系统代理端口变化后，自动模式的后续请求重新读取；已固定的旧地址需手动更新或清空。请勿填写账号密码。',
         helpVersion: '客户端协议版本用于与 Codex 服务协商能力，不会升级本机 CLI 或模型。版本过旧可能影响目录或请求。',
         helpTimeout: '流空闲超时为 5000–600000 毫秒，表示多久没有新数据才中止，不是整轮生成的总时限。',
         helpFailures: '安全排错', helpAuth: 'AUTH：请检查 Codex 登录状态，必要时通过 Codex CLI 或桌面端重新登录；不要把令牌粘贴到此页面。',
@@ -88,7 +98,17 @@ window.__ModuleLoader__.load({
         present: 'Present', missing: 'Missing', invalid: 'Invalid', unavailable: 'Unavailable',
         unknown: 'Unknown', mode: 'Authentication', chatgpt: 'ChatGPT subscription', apikey: 'API key',
         checkedAt: 'Checked at', notChecked: 'Not checked', privacy: 'This page never displays tokens or credential paths, switches accounts, or changes your default model.',
-        settings: 'Connection settings', proxy: 'Proxy URL', proxyHint: 'Leave empty to retain the adapter’s environment-proxy or direct-connection behavior. Do not include a username or password in this URL.',
+        settings: 'Connection settings', proxy: 'Fixed proxy URL', proxyHint: 'A fixed URL takes priority over environment and system settings and will not follow system port changes. Use HTTP(S) without credentials.',
+        proxyMode: 'Proxy mode', proxyAutomatic: 'Automatic', proxyManual: 'Fixed URL', proxySavedMode: 'Saved mode', proxyDraftMode: 'Draft mode (unsaved)',
+        proxyAutoHint: 'Automatic mode reads environment variables, then the enabled Windows static proxy, otherwise connects directly. Requires adapter 0.2.2+ and a full DSH restart after upgrading. Saving this mode does not pin the detected port.',
+        proxyCandidate: 'Current automatic proxy candidate', proxyEnvironment: 'Environment', proxyWindows: 'Windows system settings', proxyUseCandidate: 'Use candidate as fixed URL',
+        proxyDetectionHint: 'Local settings snapshot, not proof of connectivity. Matching NO_PROXY entries still bypass the proxy. Refresh status to read again.',
+        proxyNotDetected: 'No static system proxy is enabled. Automatic mode will connect directly; enable a system proxy or use a fixed URL if needed. PAC is not supported.',
+        proxyDetectionInvalid: 'Automatic proxy settings are invalid or cannot be displayed here. Check environment/system settings; another source is not silently selected.',
+        proxyDetectionUnavailable: 'Local proxy settings could not be read. Check system settings or use a fixed URL.',
+        proxyDetectionUnsupported: 'No supported automatic proxy source was found on this platform. Non-Windows platforms connect directly. PAC is not supported.',
+        proxyDetectionUnknown: 'Automatic proxy status is not available yet. Refresh status; do not infer direct routing or successful connectivity.',
+        proxyTroubleshoot: 'Check the saved proxy mode, running proxy application, and whether NO_PROXY bypasses ChatGPT. Draft changes are not live. Save, then refresh quota to check; repeated model tests are unnecessary.',
         clientVersion: 'Client protocol version', streamIdleTimeoutMs: 'Stream idle timeout (milliseconds)',
         timeoutHint: 'Limits how long a model stream may be idle, not the total generation duration.',
         fastMode: 'Fast: request priority processing',
@@ -134,7 +154,7 @@ window.__ModuleLoader__.load({
         helpCredential: 'A present credential does not prove valid sign-in: a readable local file does not mean the server accepts the token. Sign in again through Codex CLI or Desktop when needed.',
         helpCatalog: 'A catalog entry does not prove inference works: the catalog may be cached. Only an explicit connection test makes a real model request.',
         helpQuota: 'Quota percentages are not remaining token counts or conversation context space. A failed quota query does not mean the model is unavailable; they use different endpoints.',
-        helpSettings: 'What the settings mean', helpProxy: 'The proxy controls how the adapter reaches the service. Empty retains environment proxy or direct behavior. Never include credentials in the URL.',
+        helpSettings: 'What the settings mean', helpProxy: 'A manually saved proxy takes priority. When empty, the updated adapter reads environment variables and the enabled Windows system proxy before connecting directly. Automatic mode checks again for later requests, including port changes; update or clear a pinned old URL manually. Never include credentials.',
         helpVersion: 'Client protocol version negotiates Codex service capabilities; it does not upgrade your local CLI or model. An old version may affect catalogs or requests.',
         helpTimeout: 'Stream idle timeout is 5000–600000 milliseconds without new data, not the total time allowed for a generation.',
         helpFailures: 'Troubleshoot safely', helpAuth: 'AUTH: check Codex sign-in and sign in again through Codex CLI or Desktop if needed. Never paste tokens into this page.',
@@ -243,6 +263,11 @@ window.__ModuleLoader__.load({
           const dirtyRef = React.useRef(false);
           const draftRevision = React.useRef(null);
           const instanceId = React.useId();
+          const [proxyMode, setProxyMode] = React.useState('auto');
+          function chooseProxyMode(value) {
+            setProxyMode(value);
+            change('proxy', value === 'auto' ? '' : draft.proxy);
+          }
           function adopt(next, saved = false) {
             if (!next || typeof next.revision !== 'string' || !next.settings || !next.adapter || !next.credential) {
               throw Object.assign(new Error('malformed'), { localKey: 'malformed' });
@@ -251,6 +276,7 @@ window.__ModuleLoader__.load({
             setState(next);
             if (!dirtyRef.current) {
               draftRevision.current = next.revision;
+              setProxyMode(next.settings.proxy ? 'manual' : 'auto');
               setDraft(settingsDraft(next.settings));
               setDirty(false);
             }
@@ -425,12 +451,17 @@ window.__ModuleLoader__.load({
               onChange: event => change(key, event.target.value),
               ...(type === 'number' ? { min: 5000, max: 600000, step: 1, required: true } : {}),
               ...(key === 'clientVersion' ? { required: true } : {}),
+              ...(key === 'proxy' ? { required: true, pattern: '.*\\S.*' } : {}),
               ...(hint ? { 'aria-describedby': `${instanceId}-${key}-hint` } : {}),
             }),
             hint && h('span', { id: `${instanceId}-${key}-hint`, className: 'cm-muted' }, t(hint)));
           const credentialState = ['present', 'missing', 'invalid', 'unavailable'].includes(state?.credential?.state) ? state.credential.state : 'unknown';
           const mode = ['chatgpt', 'apikey'].includes(state?.credential?.mode) ? state.credential.mode : 'unknown';
           const usageKeys = ['inputTokens', 'outputTokens', 'totalTokens', 'cacheReadTokens', 'reasoningTokens'];
+          const proxyCandidate = state?.proxyDetection;
+          const candidateAvailable = proxyCandidate?.state === 'detected' && typeof proxyCandidate.proxy === 'string' && ['environment', 'windows-system'].includes(proxyCandidate.source);
+          const proxyDetectionNotice = ({ none: 'proxyNotDetected', invalid: 'proxyDetectionInvalid', unavailable: 'proxyDetectionUnavailable', unsupported: 'proxyDetectionUnsupported' })[proxyCandidate?.state] || 'proxyDetectionUnknown';
+          const savedProxyMode = state?.settings?.proxy ? 'manual' : 'auto';
           return h('main', { className: 'cm-panel', 'aria-busy': Boolean(busy) },
             h('style', null, css),
             h('header', { className: 'cm-header' }, h('div', { className: 'cm-eyebrow' }, 'CODEX / ', t('overview')), h('h2', null, t('title')), h('p', { className: 'cm-muted' }, t('intro'))),
@@ -440,7 +471,8 @@ window.__ModuleLoader__.load({
             error && h('div', { className: 'cm-notice cm-error', role: 'alert' },
               h('strong', null, t(error.localKey)),
               error.code && h('div', { className: 'cm-model-id' }, error.code),
-              error.message && h('div', null, error.message)),
+              error.message && h('div', null, error.message),
+              error.code === 'TRANSPORT' && h('p', { className: 'cm-muted' }, t('proxyTroubleshoot'))),
             h('section', { className: 'cm-card cm-quota-card', 'aria-labelledby': `${instanceId}-quota` },
               h('div', { className: 'cm-heading' }, h('h3', { id: `${instanceId}-quota` }, t('quotaTitle')), button('refreshQuota', () => run('quota'), !state, { className: 'cm-primary' })),
               h('p', { className: 'cm-muted' }, t('quotaHint')),
@@ -479,13 +511,28 @@ window.__ModuleLoader__.load({
               h('div', { className: 'cm-heading' }, h('h3', { id: `${instanceId}-connection` }, t('connection')), button('refreshStatus', () => run('status'))),
               state && h('div', { className: 'cm-status-line' }, h('span', { className: 'cm-badge' }, t('adapter'), ': ', t(state.adapter.active ? 'active' : 'inactive'), ' · codex'), h('span', { className: 'cm-badge' }, t('credential'), ': ', t(credentialState)), h('span', { className: 'cm-badge' }, t(mode))),
               h('p', { className: 'cm-muted' }, t('credentialNote')),
+              state && h('p', { className: 'cm-muted' }, t('proxySavedMode'), ': ', t(savedProxyMode === 'auto' ? 'proxyAutomatic' : 'proxyManual')),
               state && h('p', { className: 'cm-muted' }, t('checkedAt'), ': ', date(state.checkedAt)),
               h('p', { className: 'cm-muted' }, t('privacy'))),
             h('section', { className: 'cm-card', 'aria-labelledby': `${instanceId}-settings` },
               h('h3', { id: `${instanceId}-settings` }, t('settings')), h('p', { className: 'cm-muted' }, t('settingsHint')),
               draft && h('form', { onSubmit: save },
                 h('fieldset', { disabled: Boolean(busy) },
-                  field('proxy', 'text', 'proxyHint'),
+                  h('label', { className: 'cm-field', htmlFor: `${instanceId}-proxy-mode` },
+                    h('span', null, t('proxyMode')),
+                    h('select', { id: `${instanceId}-proxy-mode`, value: proxyMode, onChange: event => chooseProxyMode(event.target.value), 'aria-describedby': `${instanceId}-proxy-mode-hint` },
+                      h('option', { value: 'auto' }, t('proxyAutomatic')), h('option', { value: 'manual' }, t('proxyManual')))),
+                  h('p', { className: 'cm-muted', 'aria-live': 'polite' }, t('proxySavedMode'), ': ', t(savedProxyMode === 'auto' ? 'proxyAutomatic' : 'proxyManual'),
+                    proxyMode !== savedProxyMode && h('span', { className: 'cm-badge' }, t('proxyDraftMode'), ': ', t(proxyMode === 'auto' ? 'proxyAutomatic' : 'proxyManual'))),
+                  h('p', { id: `${instanceId}-proxy-mode-hint`, className: 'cm-muted' }, t('proxyAutoHint')),
+                  proxyMode === 'manual' && field('proxy', 'text', 'proxyHint'),
+                  h('div', { className: 'cm-notice' },
+                    h('strong', null, t('proxyCandidate')),
+                    candidateAvailable ? h(React.Fragment, null,
+                      h('p', null, h('span', { className: 'cm-model-id' }, proxyCandidate.proxy), ' · ', t(proxyCandidate.source === 'environment' ? 'proxyEnvironment' : 'proxyWindows')),
+                      button('proxyUseCandidate', () => { setProxyMode('manual'); change('proxy', proxyCandidate.proxy); }))
+                      : h('p', null, t(proxyDetectionNotice)),
+                    h('p', { className: 'cm-muted' }, t('proxyDetectionHint'))),
                   h('div', { className: 'cm-fast' },
                     h('label', { className: 'cm-switch-row', htmlFor: `${instanceId}-fastMode` },
                       h('span', null, t('fastMode')),
@@ -500,7 +547,7 @@ window.__ModuleLoader__.load({
                     h('div', { className: 'cm-grid' }, field('clientVersion', 'text'), field('streamIdleTimeoutMs', 'number', 'timeoutHint'))),
                   dirty && h('p', { className: 'cm-muted' }, t('dirty')),
                   dirty && state.revision !== draftRevision.current && h('p', { className: 'cm-notice' }, t('outdated')),
-                  h('div', { className: 'cm-actions cm-savebar' }, h('button', { type: 'submit', className: 'cm-primary', disabled: !dirty || Boolean(busy) }, t('save')), button('discard', discard, !dirty), h('span', { className: 'cm-muted' }, t('saveReminder')))))),
+                  h('div', { className: 'cm-actions cm-savebar' }, h('button', { type: 'submit', className: 'cm-primary', disabled: !dirty || Boolean(busy) }, t('save')), button('discard', () => { setProxyMode(state.settings.proxy ? 'manual' : 'auto'); discard(); }, !dirty), h('span', { className: 'cm-muted' }, t('saveReminder')))))),
             h('details', { className: 'cm-card cm-fold' },
               h('summary', null, t('models'), h('span', { className: 'cm-summary-note' }, t('modelsSummary'))),
               h('div', { className: 'cm-actions' }, button('refreshModels', () => run('models'), !state)),

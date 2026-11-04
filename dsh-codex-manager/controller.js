@@ -4,6 +4,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { queryQuota } from './quota.js';
 import { buildReport, errorSnapshot, quotaSnapshot, testSnapshot } from './report.js';
+import { detectProxy } from './proxy.js';
 
 const ENTRY = 'dsh-llm-codex';
 const REQUIRED_SETTINGS = ['proxy', 'clientVersion', 'streamIdleTimeoutMs'];
@@ -109,7 +110,7 @@ function assertRequest(request) {
   if (Object.keys(request).some(k => !allowed.includes(k))) fail('INVALID_REQUEST');
 }
 /** Owns bounded management work, serializes writes/tests, and cancels work on unload. */
-export function createController({ llm, configEditor, summarizeCredential = credentialSummary, quotaQuery = queryQuota, reportMetadata = () => ({}) }) {
+export function createController({ llm, configEditor, summarizeCredential = credentialSummary, quotaQuery = queryQuota, reportMetadata = () => ({}), proxyDetector = detectProxy }) {
   const lifetime = new AbortController();
   const pending = new Set();
   let busy = false;
@@ -136,7 +137,9 @@ export function createController({ llm, configEditor, summarizeCredential = cred
     const settings = settingsOf(raw);
     // Never expose a legacy proxy containing credentials or arbitrary raw settings.
     try { validateSettings(settings); } catch (error) { fail('INVALID_SETTINGS'); }
-    return { revision: revisionOf(raw), adapter: { active: active(), provider: 'codex' }, credential: await summarizeCredential(raw), settings, limits: { testTimeoutMs: 45000 }, checkedAt: new Date().toISOString() };
+    // Read a local candidate even in fixed mode so switching to automatic is informed.
+    const proxyDetection = await proxyDetector(lifetime.signal);
+    return { revision: revisionOf(raw), adapter: { active: active(), provider: 'codex' }, credential: await summarizeCredential(raw), settings, proxyDetection, limits: { testTimeoutMs: 45000 }, checkedAt: new Date().toISOString() };
   }
   async function operate(request, callerSignal) {
     assertRequest(request);

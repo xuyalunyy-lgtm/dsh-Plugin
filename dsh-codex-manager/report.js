@@ -44,8 +44,8 @@ export function buildReport({ state, metadata, latest, configurationError, now =
     },
     connection: state ? {
       proxyConfigured: typeof state.settings?.proxy === 'string' && state.settings.proxy.length > 0,
-      // An empty value may mean environment proxy OR direct; do not claim to know which.
-      proxySource: state.settings?.proxy ? 'explicit' : 'environment-or-direct',
+      // Configuration mode, not an observation of the route actually used.
+      proxySource: state.settings?.proxy ? 'explicit' : 'environment-system-or-direct',
       clientVersion: version(state.settings?.clientVersion),
       streamIdleTimeoutMs: numeric(state.settings?.streamIdleTimeoutMs, 5000, 600000),
       // Saved preference only, not evidence of the tier actually served.

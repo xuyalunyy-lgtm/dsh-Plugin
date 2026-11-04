@@ -31,6 +31,16 @@
 
 禁用插件会释放配色覆盖和 slot 注册，恢复宿主外观；Host 数据仍保留。所有请求使用 Harness 的认证及 Host/Origin 检查，不另建公开文件服务器。工具 `qinglan_theme` 与 UI 调用同一仓库操作，read 返回 revision，update/reset 使用 expectedRevision。
 
+## 1.5.5 表单与原生控件配色
+
+- 设置数值输入实际使用共享表单的 `bg-layer-3`，此前只覆盖前两层背景。本轮补齐第三层为主题 raised 表面、第四层为主题 selected 表面，并同步 `label-dimmed` 占位文字。
+- 保存按钮和实心标签采用 primary 底色、第三层背景色作反色文字；补齐第三层同时修复其反色配对，不改变按钮的禁用、校验或保存行为。
+- 检查同版本共享 SettingsForm、Input、Tag、SegmentedTabs、Checkbox、Switch 和子智能体页面实际使用；帮助按钮及模型列表悬停也使用第四层背景。
+- 宿主在 html 上以内联样式设置原生 color-scheme；插件在启用时仅为 body 指定所选配色的明暗与 brand accent，使其后代的浏览器原生复选框、下拉框等同步。不改宿主主题偏好，关闭或卸载后随样式移除恢复继承。
+- 未改用户主题、图片和方案；无全局强制文字色、生成类名或 `!important`。保存按钮未修改时仍禁用并按原生规则淡化。
+- 既有158项检查及独立源码合同审查通过。本轮未新增测试，既有检查不等于原生控件实际绘制或浏览器计算样式验收。
+- 范围：body 后代的原生控件；html 自身的视口滚动条，以及显式声明自己 color-scheme 的控件不承诺被此规则改变。
+
 ## 1.5.4 侧栏与共享控件对比度配对
 
 - 修复Windows/Web侧栏「新会话」浅底浅字：独立 elevated 背景和 floating-hover 随主题使用 raised / selected 表面，文字与快捷键仍保留各自主要/次要前景。

@@ -1,6 +1,6 @@
 # dsh-llm-codex
 
-> 📦 已发布到 npm:[dsh-llm-codex](https://www.npmjs.com/package/dsh-llm-codex)(本地开发版本 0.2.1，未发布)
+> 📦 已发布到 npm:[dsh-llm-codex](https://www.npmjs.com/package/dsh-llm-codex)(本地开发版本 0.2.2，未发布)
 > · 📚 GitHub:[yequ172672/dsh-codex-subscription](https://github.com/yequ172672/dsh-codex-subscription)
 > · 🏷️ 属于 [dsh-plugin](https://github.com/topics/dsh-plugin) 插件话题
 
@@ -148,7 +148,7 @@ dsh --profile web --dump-config   # 应看到 "# == dsh-llm-codex" 与 llm-codex
 
 ## 机器相关配置(不进包)
 
-ChatGPT 后端通常需要走本地代理;Node 原生 fetch 不读系统代理。
+ChatGPT 后端通常需要走本地代理；Node 原生 fetch 不读取系统代理，本插件从 0.2.2 起会在显式 `proxy` 为空时为实际请求自动读取本地代理，不依赖管理页面先保存地址。
 
 **DSH ≥ 44(插件 0.2.x)**:`settings.yaml` 已退役 —— DSH 启动时会把旧
 `settings.yaml` 的段一次性迁移到 profile entry 配置,之后配置入口有两个:
@@ -164,10 +164,11 @@ ChatGPT 后端通常需要走本地代理;Node 原生 fetch 不读系统代理�
     proxy: http://127.0.0.1:7890
 ```
 
-也可用环境变量 `HTTPS_PROXY`(优先级:显式 `proxy` 配置 > `HTTPS_PROXY` >
-`HTTP_PROXY`;`NO_PROXY` 命中的主机直连)。其他可选字段:`clientVersion`(默认
-`0.160.1`)、`writeBack`(默认 `true`)、`streamIdleTimeoutMs`、`authFile`、
-`modelsCacheFile`、`staticModels`(显式模型目录)。
+实际请求代理优先级为：非空显式 `proxy` > 首个非空 `HTTPS_PROXY` / `https_proxy` / `HTTP_PROXY` / `http_proxy` > Windows 当前用户已启用的静态系统代理。显式和环境代理保留原有 HTTP(S) 地址支持；选中来源无效会返回固定 `TRANSPORT` 错误，不悄悄使用低优先级来源或重试直连。`NO_PROXY` / `no_proxy` 命中主机时仍按原规则直连。
+
+Windows 只读 `ProxyEnable` / `ProxyServer`，系统代理关闭时不采用旧地址；按 HTTPS 目标条目、HTTP 条目或统一 `host:port` 解析，其中 `https=host:port` 使用 HTTP CONNECT 代理，不会错误改为 HTTPS 代理协议。每次获取传输时读取当前本地设置，并按实际代理地址复用或重建传输，所以系统端口变化不会永久沿用旧端口；没有轮询、TTL、端口扫描、PAC 执行、网络探测或 profile / 注册表自动写入。使用一次有界的只读命令查询 Internet Settings 键；成功读键但缺少 `ProxyEnable` 视为未配置代理，值为 0 同样可直连。命令读取错误、无效的 `ProxyEnable` 值、启用但缺少有效 `ProxyServer` 或不支持的静态地址明确失败，不把无法读取误当成允许直连，不反射原始注册表输出、密码或本地路径。Windows 以外且无显式 / 环境代理时直连。显式代理始终优先；若显式保存了过期端口，需手动修改或清空后才会采用系统代理。更换本版代码需重启 DSH，后续本地代理变化随下一次请求读取。
+
+其他可选字段：`clientVersion`(默认 `0.160.1`)、`writeBack`(默认 `true`)、`streamIdleTimeoutMs`、`authFile`、`modelsCacheFile`、`staticModels`(显式模型目录)。
 
 选用 codex 作为默认模型(`cordis.patch.yml`):
 
@@ -215,7 +216,7 @@ npm run test:probe                    # client_version 门控探针 + 最小流�
 | 现象 | 处理 |
 | --- | --- |
 | `MISSING_CREDENTIAL:无法读取 Codex 凭证文件` | 先运行 `codex login` 登录 |
-| `TRANSPORT:Connect Timeout` | 本机直连 ChatGPT 后端被墙;配置 `proxy`(见上文) |
+| `TRANSPORT:Connect Timeout` | 检查实际代理是否开启及端口是否可用；空配置会自动读环境 / Windows 静态系统代理，非空显式配置始终优先 |
 | HTTP 401 且刷新失败 | 订阅过期或被风控;运行 `codex login` 重新登录 |
 | HTTP 429 | 订阅额度/限流,稍后重试 |
 | `INVALID_REQUEST:System messages are not allowed` | 系统提示已自动改走 `instructions` 字段,不应出现;如出现请升级插件 |

@@ -37,7 +37,7 @@ window.__ModuleLoader__.load({
       resetParameters: '重置背景参数（保留图片）', resetAll: '恢复全部默认设置',
       resetWarning: '将恢复青岚配色并清除当前背景。若要保留当前外观，请先保存为方案。',
       confirmReset: '确认恢复并移除图片', cancel: '取消', resetHelp: '仅重置显现度、模糊、铺放、位置和默认渐变，不改变配色或图片。',
-      rawEmpty: '尚未选择背景图片', version: '版本 1.5.4',
+      rawEmpty: '尚未选择背景图片', version: '版本 1.5.5',
       positionX: '横向位置', positionY: '纵向位置', alignTop: '靠上', alignCenter: '居中', alignBottom: '靠下',
       positionHint: '0% 为左侧 / 顶部，50% 为居中，100% 为右侧 / 底部。只有图片存在可移动或裁切空间时，位置变化才明显。',
       presets: '外观方案', presetName: '方案名称', savePreset: '保存当前外观', applyPreset: '应用', renamePreset: '重命名', deletePreset: '删除方案',
@@ -60,7 +60,7 @@ window.__ModuleLoader__.load({
       resetParameters: 'Reset background controls (keep image)', resetAll: 'Restore all defaults',
       resetWarning: 'This restores the Sage palette and clears the current background. Save a look first if you want to retain this appearance.',
       confirmReset: 'Restore and remove image', cancel: 'Cancel', resetHelp: 'Resets visibility, blur, placement, position and default gradient only. Keeps your palette and image.',
-      rawEmpty: 'No background image selected', version: 'Version 1.5.4',
+      rawEmpty: 'No background image selected', version: 'Version 1.5.5',
       positionX: 'Horizontal position', positionY: 'Vertical position', alignTop: 'Top', alignCenter: 'Center', alignBottom: 'Bottom',
       positionHint: '0% is left/top, 50% is centered, 100% is right/bottom. Position changes are visible only when the image has free space or cropping.',
       presets: 'Saved looks', presetName: 'Look name', savePreset: 'Save current appearance', applyPreset: 'Apply', renamePreset: 'Rename', deletePreset: 'Delete look',
@@ -257,6 +257,10 @@ window.__ModuleLoader__.load({
           // Native Appearance selections use bg-module-platform, NOT bg-layer-*.
           // Keep semantic surfaces paired with the overridden foreground in both modes.
           const surfaces = {
+            // Settings fields, inverse save labels and segmented indicators use layer 3.
+            '--dsw-alias-bg-layer-3': colors[1],
+            '--dsw-alias-bg-layer-4': colors[2],
+            '--dsw-alias-label-dimmed': colors[8],
             '--dsw-alias-bg-module-platform': colors[2],
             '--dsw-alias-interactive-bg-hover': colors[2],
             '--dsw-alias-settings-card-fill': colors[1],
@@ -380,7 +384,11 @@ window.__ModuleLoader__.load({
         function Background() {
           const s = useState();
           if (!s.enabled) return null;
-          return h(React.Fragment, null, h('style', null, settingsCompatibility), h(BackgroundLayers, { settings: s, fixed: true }));
+          // The Host owns html's inline color-scheme. Set the inherited scheme on body
+          // instead, without changing that preference or overriding control-specific styles.
+          return h(React.Fragment, null, h('style', null,
+            `body { color-scheme: ${paletteGroups.darkPalettes.includes(s.palette) ? 'dark' : 'light'}; accent-color: var(--dsw-alias-brand-primary); }\n${settingsCompatibility}`),
+            h(BackgroundLayers, { settings: s, fixed: true }));
         }
         function Panel() {
           useLocale();

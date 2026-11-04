@@ -11,13 +11,30 @@
 
 ## 部署及验证
 
-当前 desktop profile 直接引用本目录的 `index.mjs`，没有独立构建或复制步骤；但源码更新不等于当前 Host 已重新加载。正常重启 DSH 并刷新原 GUI 后，再从原界面的“在 VS Code 中打开”入口验收。不要启动替代 Web 服务。
+当前 desktop profile 在 `cordis.patch.yml` 中停用官方 `open-in-app` 条目，并通过 `insert` 添加独立的 `open-in-app-local-fix` 条目，引用本目录的 `index.mjs`，保留官方的探测、图标和启动超时配置；没有独立构建或复制步骤。注意：patch 中的 `name` 是原模块名称的匹配断言，不是替换字段；给原条目直接写入修复模块路径会触发名称不匹配而跳过整条 patch。修复器从 Host 的 `argv[2]` 获取当前运行时根，不依赖旧安装目录。
+
+```yaml
+- id: open-in-app
+  name: '@deepseek-ai/dsh-host-open-in-app'
+  disabled: true
+- insert:
+    - id: open-in-app-local-fix
+      name: file:///D:/xuyl/tool/DSH/dsh-open-in-app-fix/index.mjs
+      config:
+        probeTimeoutMs: 10000
+        iconTimeoutMs: 10000
+        launchWatchMs: 1000
+```
+
+VS Code 使用注册表或安装目录根下的 `Code.exe`；当前用户安装为 `C:\Users\Administrator\AppData\Local\Programs\Microsoft VS Code\Code.exe`。不要改指向随更新变化的版本子目录或 `resources/app`。
+
+配置或源码更新不等于当前 Host 已重新加载。正常重启 DSH 并刷新原 GUI 后，再从原界面的“在 VS Code 中打开”入口验收。不要启动替代 Web 服务。
 
 离线测试（不会启动 VS Code、绑定端口或修改 profile）：
 
 ```powershell
 $env:ELECTRON_RUN_AS_NODE = '1'
-& 'D:\deepseekH\DeepSeek Harness.exe' 'D:\xuyl\tool\DSH\dsh-open-in-app-fix\test.mjs' 'D:\deepseekH\resources\app.asar\dsh'
+& 'D:\xuyl\tool\dsh_app\DeepSeek Harness.exe' 'D:\xuyl\tool\DSH\dsh-open-in-app-fix\test.mjs' 'D:\xuyl\tool\dsh_app\resources\app.asar\dsh'
 Remove-Item Env:ELECTRON_RUN_AS_NODE
 ```
 
