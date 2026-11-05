@@ -1,0 +1,18 @@
+import {createRequire} from 'node:module';
+import {readFile,writeFile,mkdir} from 'node:fs/promises';
+import {resolve} from 'node:path';
+import {createHash} from 'node:crypto';
+import {upgradeNeverPurgeSource} from './derived-patch.mjs';
+import {buildArchive} from './archive.mjs';
+const require=createRequire(import.meta.url);const asar=require('../../dsh-desktop-quick-actions/node_modules/@electron/asar');
+const hash=b=>createHash('sha256').update(b).digest('hex');
+const target=resolve(process.argv[2]),output=resolve(process.argv[3]);
+const originalArchiveSha256=hash(await readFile(target));
+if(originalArchiveSha256!=='849d46194ad0d0e82fff7296d5f5529d28e8af6cb2e0f2fc8cf596c8a01bf16c')throw Error('Installed purge baseline differs; refusing upgrade');
+const path='dsh/node_modules/@deepseek-ai/dsh-session-query-sqlite/lib/index.js';
+const original=asar.extractFile(target,path.replaceAll('/','\\')).toString('utf8');
+const updated=upgradeNeverPurgeSource(original);
+await mkdir(output);const payload=resolve(output,'session-query-sqlite.js');await writeFile(payload,updated,{flag:'wx'});
+const plan={version:1,status:'candidate-not-installed',target,originalArchiveSha256,desktopVersion:'0.2.2-rc.1',buildCommit:'c59d10aff167ad7eefead4b3a9082fb57c8fbfe8',files:[{path,payload,originalSha256:hash(original),patchedSha256:hash(updated)}]};
+Object.assign(plan,await buildArchive(plan,resolve(output,'app.asar')));
+await writeFile(resolve(output,'plan.json'),JSON.stringify(plan,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify(plan,null,2));
