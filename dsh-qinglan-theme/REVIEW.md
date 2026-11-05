@@ -1,5 +1,28 @@
 # 分阶段审查记录
 
+## 布局与主要组件主题协调：1.6.0（2026-11-05）
+
+- 本轮优化设置页卡片层级、导航、主题色卡及背景预览/参数布局。宽窄切换使用面板container查询，双列为minmax(0,...)，自然DOM/Tab顺序不重排；外/内字段集禁用、上传与保存队列、确认Escape/回焦接线保持。
+- 原生md/lg/xl/panel圆角沿当前rc1真实变量收紧；当前聊天列宽有用户拖拽优先与embedded局部定义，未抢写全局width，未增加会被子元素遮蔽的阴影覆盖。
+- 固定白图标info按钮采用主题对应深brand，dark映射到同色浅组；悬停朝black加深。面板主按钮使用原配对primary/foreground。
+- 独立审查发现新danger文字跟随宿主error色会在浅palette拆对，已改为label-primary文字+语义边框；selected tab hover被通用hover盖过，已用更具体规则保留选中层。
+- 最终复审无阻塞，主控和独立既有158项均通过；最后两处样式修正读回确认，未因同一结果重复执行测试。未新增测试/模拟DOM。
+- 安装1.6.0 application=applied、warnings=[]；实时Theme新增radius变量，settings.section中local-qinglan active，确认更新运行层和页面注册。
+- 不改变Host外观数据、方案或图片，无生成类选择器和宿主根替换。CSS清理包含删除宽泛preview span定位与重复声明。
+- 仍无真实浏览器布局截图、窄栏滚动/Tab实测或新info配色的专项自动对比度检查；安装与token注册不是视觉验收。
+
+
+## 选区引用悬浮按钮：1.5.6（2026-11-05）
+
+- 当前宿主已为0.2.2-rc.1；精确message-quotes源码确认「引用文本」是QuoteSelection按钮，普通背景button-floating-fill、前景label-primary，悬停与focus-visible背景button-floating-hover。
+- 此前仅覆盖floating-hover，遗漏普通背景。本轮只补floating-fill=raised表面；同变量的聊天回到底部按钮也使用label-primary，配对一致。
+- 不替换text-interaction Slot，不改选区、引用插入或按钮事件，不动用户主题、图片、方案和Host数据。
+- 独立复审无阻塞；同一surfaces循环提供完整light/dark对，沿用同NS原子替换与关闭/卸载释放，无额外资源。
+- 既有158项检查、语法和diff检查通过；没有新增测试。既有对比度检查覆盖复用的前景与普通/悬停纯色表面，不执行按钮挂接、焦点或选区交互。
+- 安装1.5.6 application=applied、warnings=[]；实时Theme清单出现button-floating-fill，确认新增覆盖逻辑已运行。
+- 尚无刷新后引用按钮的浏览器计算样式或视觉验收，不将新增变量注册等同于最终画面通过。
+
+
 ## 表单与原生控件：1.5.5（2026-11-04）
 
 - 用户子智能体设置截图：数值输入使用 fields 的第三层背景，保存文字也使用第三层作反色前景；此前仅覆盖前两层，导致白底浅字和保存文字拆对。

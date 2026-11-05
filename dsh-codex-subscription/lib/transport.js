@@ -1,9 +1,9 @@
 /**
  * 传输层:可选 HTTP CONNECT 代理(Clash 等)。
  *
- * 背景:Node 的原生 fetch(undici)不读取系统代理/代理环境变量,而 ChatGPT
- * 后端通常需要走本地代理。部署依赖树中已有 node-fetch + https-proxy-agent,
- * 这里组合它们:配置了代理时经 CONNECT 隧道转发,否则直接用原生 fetch。
+ * DSH 为原生 fetch 安装环境代理策略;本传输另支持显式和 Windows 静态系统代理。
+ * 部署依赖树中已有 node-fetch + https-proxy-agent,
+ * 这里组合它们:配置了代理时经 CONNECT 隧道转发,否则使用原生 fetch。
  *
  * 代理解析优先级:显式配置 proxy > 首个非空代理环境变量 > Windows 已启用静态系统代理。
  * 每次获取传输时重新读取本地设置;NO_PROXY 命中的主机直连。
@@ -74,16 +74,34 @@ export async function resolveProxyUrl(config) {
   return proxyUrl(/^https?:\/\//i.test(value) ? value : `http://${value}`, true);
 }
 
-/** NO_PROXY 判定:逗号分隔条目,支持精确 host 与 *.suffix。 */
-export function shouldBypassProxy(hostname, noProxyValue) {
+/** Match DSH NO_PROXY rules against the complete URL, including default ports. */
+export function shouldBypassProxy(url, noProxyValue) {
   if (typeof noProxyValue !== 'string' || noProxyValue.trim().length === 0) return false;
-  const host = String(hostname ?? '').toLowerCase();
-  for (const raw of noProxyValue.split(',')) {
+  const host = url.hostname.replace(/^\[|\]$/g, '').replace(/\.$/, '').toLowerCase();
+  const port = url.port || (url.protocol === 'https:' ? '443' : '80');
+  for (const raw of noProxyValue.split(/[,\s]+/)) {
     const entry = raw.trim().toLowerCase();
-    if (entry.length === 0) continue;
-    if (entry === host) return true;
-    if (entry.startsWith('*') && host.endsWith(entry.slice(1))) return true;
-    if (entry.startsWith('.') && host.endsWith(entry)) return true;
+    if (!entry) continue;
+    if (entry === '*') return true;
+    let entryHost = entry;
+    let entryPort;
+    if (entry.startsWith('[')) {
+      const close = entry.indexOf(']');
+      if (close !== -1) {
+        entryHost = entry.slice(1, close);
+        const rest = entry.slice(close + 1);
+        if (rest.startsWith(':')) entryPort = rest.slice(1);
+      }
+    } else {
+      const colon = entry.indexOf(':');
+      if (colon !== -1 && entry.indexOf(':', colon + 1) === -1) {
+        entryHost = entry.slice(0, colon);
+        entryPort = entry.slice(colon + 1);
+      }
+    }
+    if (entryPort !== undefined && entryPort !== port) continue;
+    const candidate = entryHost.replace(/^\*?\./, '').replace(/\.$/, '');
+    if (candidate && (host === candidate || host.endsWith(`.${candidate}`))) return true;
   }
   return false;
 }
@@ -111,7 +129,7 @@ export async function createTransport(config, resolvedProxyUrl) {
     const agent = new HttpsProxyAgent(proxyUrl);
     const proxyFetch = (url, init = {}) => {
       const target = typeof url === 'string' ? new URL(url) : url;
-      if (shouldBypassProxy(target.hostname, process.env.NO_PROXY ?? process.env.no_proxy)) {
+      if (shouldBypassProxy(target, process.env.NO_PROXY ?? process.env.no_proxy)) {
         return fetch(url, init);
       }
       return nodeFetch(url, { ...init, agent });

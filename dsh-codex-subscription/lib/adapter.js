@@ -120,7 +120,7 @@ export class CodexAdapter extends LlmAdapter {
   async resolveCatalog(signal) {
     const config = this.options();
     const creds = await this.credentials.current();
-    const transport = await this.transport();
+    signal?.throwIfAborted();
     const key = JSON.stringify([
       creds.mode,
       creds.baseURL,
@@ -134,6 +134,7 @@ export class CodexAdapter extends LlmAdapter {
     if (hit !== undefined && hit.key === key && hit.expiresAt > now) {
       catalog = hit.value;
     } else {
+      const transport = await this.transport();
       catalog = await buildCatalog(creds, config, signal, transport);
       this.catalogCache = { key, expiresAt: now + CATALOG_TTL_MS, value: catalog };
     }
@@ -235,9 +236,10 @@ export class CodexAdapter extends LlmAdapter {
     const images = await this.resolveImages(options, signal);
     const body = serializeRequest(options, images, config);
     let retried = false;
+    let creds = await this.credentials.current();
 
     while (true) {
-      const creds = await this.credentials.current();
+      signal.throwIfAborted();
       // ChatGPT 订阅后端是 Responses 协议的受限实现,以下标准字段会被拒绝
       // (HTTP 400 "Unsupported parameter: …"):max_output_tokens / temperature / stop。
       // 订阅模式一律剥离,改用后端默认;官方 API key 模式不受影响。
@@ -299,8 +301,9 @@ export class CodexAdapter extends LlmAdapter {
         const id = requestId(response.headers);
 
         if (response.status === 401 && creds.mode === 'chatgpt' && !retried) {
+          signal.throwIfAborted();
           retried = true;
-          await this.credentials.refresh(); // 刷新失败会抛 AUTH
+          creds = await this.credentials.refresh(); // 本次重试不依赖刷新令牌成功写回文件
           continue;
         }
 

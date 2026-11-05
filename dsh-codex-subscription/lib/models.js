@@ -95,8 +95,11 @@ export async function readModelsCacheFile(file) {
   }
 }
 
-/** 从 ChatGPT 后端拉取实时模型目录(GET {base}/codex/models)。任何失败返回 null。 */
+/** 从 ChatGPT 后端拉取实时模型目录;10s 超时或失败返回 null,调用方取消则抛出。 */
 export async function discoverModelsLive(creds, clientVersion, signal, transport) {
+  signal?.throwIfAborted();
+  const timeoutSignal = AbortSignal.timeout(10_000);
+  const liveSignal = signal === undefined ? timeoutSignal : AbortSignal.any([signal, timeoutSignal]);
   // 未配置时也要落到默认 wire 版本:把 undefined 写进 query/header 会让
   // 服务端拿到字面量 "undefined" 而拒绝目录。
   const version =
@@ -116,8 +119,14 @@ export async function discoverModelsLive(creds, clientVersion, signal, transport
       headers[CODEX_HEADERS.VERSION] = version;
       if (creds.accountId) headers[CODEX_HEADERS.ACCOUNT_ID] = creds.accountId;
     }
-    const response = await transport.fetch(url, { method: 'GET', headers, signal });
-    if (!response.ok) return null;
+    const response = await transport.fetch(url, { method: 'GET', headers, signal: liveSignal });
+    if (!response.ok) {
+      // 不读取错误响应体:直接释放 Node/Web 流,避免占用连接或等待无限响应。
+      if (typeof response.body?.destroy === 'function') response.body.destroy();
+      else await response.body?.cancel();
+      signal?.throwIfAborted();
+      return null;
+    }
     const data = await response.json();
     const entries = Array.isArray(data.models) ? data.models : Array.isArray(data.data) ? data.data : [];
     const out = [];
@@ -145,6 +154,7 @@ export async function discoverModelsLive(creds, clientVersion, signal, transport
     }
     return out.length > 0 ? out : null;
   } catch {
+    signal?.throwIfAborted();
     return null;
   }
 }
@@ -180,8 +190,7 @@ export async function buildCatalog(creds, config, signal, transport) {
       maxTokens: entry.maxTokens,
     }));
   } else {
-    const liveSignal = signal ?? AbortSignal.timeout(10_000);
-    entries = await discoverModelsLive(creds, config.clientVersion, liveSignal, transport);
+    entries = await discoverModelsLive(creds, config.clientVersion, signal, transport);
     if (entries === null) {
       // 缺省路径必须由 defaultModelsCacheFile 解析:未显式配置时旧实现
       // 传了 undefined 给 readFile,导致缓存兜底永远静默失败。
@@ -192,6 +201,7 @@ export async function buildCatalog(creds, config, signal, transport) {
     }
   }
 
+  signal?.throwIfAborted();
   const seen = new Set();
   const out = [];
   for (const entry of entries) {

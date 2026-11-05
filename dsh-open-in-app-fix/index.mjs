@@ -1,4 +1,4 @@
-// Local, reversible workaround for reviewed DSH Desktop 0.2.1-rc.3 and rc.5 on Windows.
+// Local, reversible workaround for reviewed DSH Desktop 0.2.1-rc.3, rc.5 and 0.2.2-rc.1 on Windows.
 // Reuses the official host's routes and security checks. Does not mutate process.env.
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -17,12 +17,13 @@ export const name = 'open-in-app-local-fix';
 export const inject = official.inject;
 export const Config = official.Config;
 
-// rc.5 changes the package version/dependency metadata only; all five pinned
-// implementation files below are byte-identical to the reviewed rc.3 baseline.
+// rc.5 and 0.2.2-rc.1 change package version/dependency metadata only; all five
+// pinned implementation files below are byte-identical to the reviewed rc.3 baseline.
 // Keep exact known manifests instead of trusting arbitrary future versions.
 const reviewedManifests = new Set([
   '426bee22ffbc9bc51cafd55559c6bbeffbc017a4dbf5ec4722308bd3de549d14', // rc.3
   '845638ea1f8ad83346303afd2c36de97ea313929d68beb7d4720ca0edb553cbb', // rc.5
+  'deff243d06b29472e1d2986401410063474379c8c60f8af5b6666ba393600b9f', // 0.2.2-rc.1
 ]);
 const reviewed = {
   'lib/index.js': 'b1d17a0c2646389b27eefab2e1e22576a693b11c61c76884fc049aff54e00d96',

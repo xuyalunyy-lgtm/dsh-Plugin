@@ -1,6 +1,6 @@
 # dsh-llm-codex
 
-> 📦 已发布到 npm:[dsh-llm-codex](https://www.npmjs.com/package/dsh-llm-codex)(本地开发版本 0.2.2，未发布)
+> 📦 已发布到 npm:[dsh-llm-codex](https://www.npmjs.com/package/dsh-llm-codex)(本地开发版本 0.2.4，未发布)
 > · 📚 GitHub:[yequ172672/dsh-codex-subscription](https://github.com/yequ172672/dsh-codex-subscription)
 > · 🏷️ 属于 [dsh-plugin](https://github.com/topics/dsh-plugin) 插件话题
 
@@ -14,12 +14,15 @@ DSH(DeepSeek Harness)LLM 适配器插件:**直接复用 Codex CLI 的本地登�
 
 | 插件版本 | DSH 桌面端 | 宿主 dsh-llm | 配置模型 |
 | --- | --- | --- | --- |
-| 0.2.x | ≥ 44(0.2.0-rc.2) | 0.2.x | 导出 `Config` + 全字段 `.volatile()`,设置页自动生成 |
+| 0.2.3–0.2.4 | 0.2.1-rc.3 / 0.2.2-rc.1 | 同左，由宿主共享 | 导出 `Config` + 全字段 `.volatile()`,设置页自动生成 |
+| 0.2.0–0.2.2 | ≥ 44(0.2.0-rc.2) | 0.2.x | 导出 `Config` + 全字段 `.volatile()`,设置页自动生成 |
 | 0.1.x | ≤ 43(0.1.0-rc.6) | 0.1.x | `settings.yaml` 的 `llm-codex:` 段 |
 
 0.1.x 在 DSH ≥ 44 上会装载失败:宿主已删除 `settings.register`(设置服务重构为
 表单投影),且 `LlmRuntime` 每次调用都会调用 0.1.x `LlmAdapter` 上不存在的
-`prepareCall`。请使用 0.2.x。
+`prepareCall`。请使用匹配宿主版本的 0.2.x。
+
+0.2.3 将 `@deepseek-ai/dsh-llm` 声明为宿主 peer（`0.2.1-rc.3 || 0.2.2-rc.1`），而非插件私有运行依赖，避免准备模型时抛出的 `LlmError` 因重复模块身份被 Host 记为 `UNKNOWN`。DSH 的 linked 插件解析器优先从宿主解析 peer，优先级高于本地开发依赖；本地仍保留 rc.3 devDependency 供既有离线测试使用。更换依赖声明和运行源码后需完整重启 DSH；插件清单显示 active 不等于已验证所有请求及错误路径。
 
 **Codex wire 版本**:服务端按 `version` 头门控模型目录 —— 旧默认 `0.144.1` 只返回
 旧目录且拒绝 `gpt-6.1-sol`(HTTP 400 "not supported … ChatGPT account");0.2.x 默认
@@ -66,6 +69,15 @@ Codex CLI(`codex login`)会把 ChatGPT 订阅的 OAuth 令牌写入 `~/.codex/au
   "No tool output found for function call"(400)拒绝整轮请求。
 - **多模态**:用户上传的图片按附件 id 读取,编码成 `input_image` + `data:` URL 发送;
   目录里 `input_modalities` 含 `image` 的模型(2026-10 目录 9 个模型全部支持)可直接看图。
+
+## 0.2.4 请求生命周期整理
+
+- `adapter.js` 只协调目录缓存、模型请求和一次 401 重试；每次仍读取当前凭据，命中有效目录缓存后不再初始化传输或读取系统代理。
+- `models.js` 在实时目录 GET 边界同时保留调用方取消和独立 10 秒上限。目录自身超时/不可用仍使用既有文件/静态目录回退，调用方取消则直接传播，不会作为“成功回退”继续准备请求。非成功 HTTP 响应关闭响应体。
+- 401 刷新成功后，本次唯一一次重试直接使用返回的内存凭据，不依赖 `writeBack` 是否开启或文件写回是否成功；未增加任何额外重试。
+- `auth.js` 仍拥有共享刷新与既有写回规则，`transport.js` 仍只负责代理选择和 HTTP 传输；没有增加自定义代理 Agent、后台轮询或新的配置项。
+
+验证边界：既有离线测试覆盖序列化、Fast 和装载契约，并非这些取消/刷新场景的专项测试。没有执行真实令牌刷新或模型请求。共享刷新仍受自身 15 秒时限约束，不由单个请求取消；刷新期间外部同时修改凭据文件的写回竞争未在本轮改变。
 
 ## Fast 模式（默认关闭）
 
@@ -148,7 +160,7 @@ dsh --profile web --dump-config   # 应看到 "# == dsh-llm-codex" 与 llm-codex
 
 ## 机器相关配置(不进包)
 
-ChatGPT 后端通常需要走本地代理；Node 原生 fetch 不读取系统代理，本插件从 0.2.2 起会在显式 `proxy` 为空时为实际请求自动读取本地代理，不依赖管理页面先保存地址。
+ChatGPT 后端通常需要走本地代理。DSH 0.2.2-rc.1 已为 Node 原生 fetch 安装环境代理策略；本插件从 0.2.2 起还会在显式 `proxy` 为空时为自身请求自动读取环境 / Windows 静态系统代理，不依赖管理页面先保存地址。
 
 **DSH ≥ 44(插件 0.2.x)**:`settings.yaml` 已退役 —— DSH 启动时会把旧
 `settings.yaml` 的段一次性迁移到 profile entry 配置,之后配置入口有两个:
@@ -164,7 +176,7 @@ ChatGPT 后端通常需要走本地代理；Node 原生 fetch 不读取系统代
     proxy: http://127.0.0.1:7890
 ```
 
-实际请求代理优先级为：非空显式 `proxy` > 首个非空 `HTTPS_PROXY` / `https_proxy` / `HTTP_PROXY` / `http_proxy` > Windows 当前用户已启用的静态系统代理。显式和环境代理保留原有 HTTP(S) 地址支持；选中来源无效会返回固定 `TRANSPORT` 错误，不悄悄使用低优先级来源或重试直连。`NO_PROXY` / `no_proxy` 命中主机时仍按原规则直连。
+实际请求代理优先级为：非空显式 `proxy` > 首个非空 `HTTPS_PROXY` / `https_proxy` / `HTTP_PROXY` / `http_proxy` > Windows 当前用户已启用的静态系统代理。显式和环境代理保留原有 HTTP(S) 地址支持；选中来源无效会返回固定 `TRANSPORT` 错误，不悄悄使用低优先级来源或重试直连。0.2.3 的 `NO_PROXY` / `no_proxy` 按完整请求 URL 匹配，与 DSH 0.2.2-rc.1 的绕过列表语义一致：逗号或空白分隔，`*` 全部绕过；裸域、`.domain` 和 `*.domain` 均匹配该域及子域；可用 `host:port` 或 `[IPv6]:port` 限定端口，HTTPS / HTTP 默认端口为 443 / 80；忽略主机名大小写和尾点，不匹配 CIDR。命中后使用原生 fetch 的直连分支，不再发送至本插件的代理 agent。
 
 Windows 只读 `ProxyEnable` / `ProxyServer`，系统代理关闭时不采用旧地址；按 HTTPS 目标条目、HTTP 条目或统一 `host:port` 解析，其中 `https=host:port` 使用 HTTP CONNECT 代理，不会错误改为 HTTPS 代理协议。每次获取传输时读取当前本地设置，并按实际代理地址复用或重建传输，所以系统端口变化不会永久沿用旧端口；没有轮询、TTL、端口扫描、PAC 执行、网络探测或 profile / 注册表自动写入。使用一次有界的只读命令查询 Internet Settings 键；成功读键但缺少 `ProxyEnable` 视为未配置代理，值为 0 同样可直连。命令读取错误、无效的 `ProxyEnable` 值、启用但缺少有效 `ProxyServer` 或不支持的静态地址明确失败，不把无法读取误当成允许直连，不反射原始注册表输出、密码或本地路径。Windows 以外且无显式 / 环境代理时直连。显式代理始终优先；若显式保存了过期端口，需手动修改或清空后才会采用系统代理。更换本版代码需重启 DSH，后续本地代理变化随下一次请求读取。
 
@@ -200,12 +212,14 @@ patch 文件只含插件行,不含任何机器相关的配置。
 ## 测试
 
 ```powershell
-npm test                              # 序列化单元测试 + 0.2.0 装载契约测试
+npm test                              # 序列化 / Fast 离线测试 + 0.2.0 形状装载契约测试
 npm run test:smoke                    # 文本对话(默认模型 gpt-6.1-sol)
 npm run test:smoke -- gpt-5.5         # 指定模型
 npm run test:smoke -- gpt-6.1-sol --tools   # 额外验证工具调用路径
 npm run test:probe                    # client_version 门控探针 + 最小流式对话
 ```
+
+`npm test` 使用本地 rc.3 devDependency 与模拟宿主，不读取真实凭据、不联网；其通过不代表已经验证 0.2.2-rc.1 Host 的共享模块身份、NO_PROXY 实际路由或真实账号能力。当前既有离线用例没有覆盖 NO_PROXY matcher，需部署后另行按授权范围验证；不能用 active 状态替代这些检查。
 
 冒烟测试输出凭证形态、模型目录(实时拉取)、一次真实流式对话的结果与 usage。
 测试默认只读(`writeBack: false`),绝不改写 auth.json;需要走代理时设置

@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { quotaFailureSnapshot } from './diagnostics.js';
 
 function failure(code) { throw Object.assign(new Error('Quota query failed'), { code }); }
 function number(value, min, max) { return typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max ? value : null; }
@@ -35,6 +36,14 @@ export async function adapterTransport(config, profileDir = process.env.DSH_PROF
 }
 /** GET only; no refresh, credentials writeback, retry, history or model generation. */
 export async function queryQuota(config, signal, { readCredential, transport = adapterTransport } = {}) {
+  const started = performance.now();
+  function transportFailure(error, stage) {
+    const code = signal?.aborted ? 'TIMEOUT' : stage === 'transport' ? 'QUOTA_TRANSPORT' : 'TRANSPORT';
+    throw Object.assign(new Error('Quota query failed'), { code, quotaFailure: quotaFailureSnapshot({
+      stage, networkCode: signal?.aborted ? 'ABORTED' : error?.code ?? error?.cause?.code ?? error?.type,
+      elapsedMs: Math.round(performance.now() - started),
+    }) });
+  }
   const auth = await readCredential(config);
   const key = typeof auth?.OPENAI_API_KEY === 'string' && auth.OPENAI_API_KEY.trim().length > 0;
   const token = auth?.tokens?.access_token;
@@ -42,10 +51,12 @@ export async function queryQuota(config, signal, { readCredential, transport = a
   if (typeof token !== 'string' || !token.length) failure('MISSING_CREDENTIAL');
   const headers = { authorization: `Bearer ${token}`, accept: 'application/json' };
   if (typeof auth?.tokens?.account_id === 'string' && auth.tokens.account_id.length < 512) headers['chatgpt-account-id'] = auth.tokens.account_id;
-  const t = await transport(config);
+  let t;
+  try { t = await transport(config); }
+  catch (error) { transportFailure(error, 'transport'); }
   let response;
   try { response = await t.fetch('https://chatgpt.com/backend-api/wham/usage', { method: 'GET', headers, signal, redirect: 'error' }); }
-  catch (error) { if (signal?.aborted) failure('TIMEOUT'); failure('TRANSPORT'); }
+  catch (error) { transportFailure(error, 'request'); }
   if (!response.ok) {
     // Do not consume or reflect the provider error body.
     response.body?.destroy?.();
@@ -64,7 +75,7 @@ export async function queryQuota(config, signal, { readCredential, transport = a
       if (bytes > 262144) failure('QUOTA_FORMAT');
       parts.push(part);
     }
-  } catch (error) { if (signal?.aborted) failure('TIMEOUT'); if (error?.code === 'QUOTA_FORMAT') throw error; failure('TRANSPORT'); }
+  } catch (error) { if (!signal?.aborted && error?.code === 'QUOTA_FORMAT') throw error; transportFailure(error, 'body'); }
   let raw;
   try { raw = JSON.parse(Buffer.concat(parts).toString('utf8')); } catch (error) { failure('QUOTA_FORMAT'); }
   return normalizeQuota(raw);

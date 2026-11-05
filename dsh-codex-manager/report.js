@@ -1,3 +1,5 @@
+import { quotaFailureSnapshot } from './diagnostics.js';
+
 const VERSION = /^\d{1,4}\.\d{1,4}\.\d{1,4}(?:[-+][a-zA-Z0-9.-]{1,48})?$/;
 const ACTIONS = new Set(['status', 'models', 'saveSettings', 'test', 'quota']);
 const CODES = new Set(['INVALID_REQUEST', 'ADAPTER_MISSING', 'ENTRY_AMBIGUOUS', 'CONFLICT', 'INVALID_SETTINGS', 'EXPRESSION_CONFIG', 'BUSY', 'CLOSED', 'MODEL_REQUIRED', 'TIMEOUT', 'AUTH', 'MISSING_CREDENTIAL', 'RATE_LIMIT', 'INVALID_REQUEST_PROVIDER', 'TRANSPORT', 'SERVER', 'QUOTA_FORMAT', 'QUOTA_UNAVAILABLE', 'QUOTA_TRANSPORT', 'FAILED']);
@@ -27,8 +29,9 @@ export function quotaSnapshot(value) {
   })) : [];
   return { state: enumOf(value.state, ['available', 'unavailable', 'unsupported'], 'unavailable'), windows, checkedAt: timestamp(value.checkedAt) };
 }
-export function errorSnapshot(action, code, at) {
-  return { action: ACTIONS.has(action) ? action : 'unknown', code: safeCode(code), at: timestamp(at) };
+export function errorSnapshot(action, code, at, quotaFailure) {
+  const detail = action === 'quota' ? quotaFailureSnapshot(quotaFailure) : null;
+  return { action: ACTIONS.has(action) ? action : 'unknown', code: safeCode(code), at: timestamp(at), ...(detail ? { quotaFailure: detail } : {}) };
 }
 /** Build a bounded, explicit report; never serialize raw config or errors by spreading them. */
 export function buildReport({ state, metadata, latest, configurationError, now = new Date().toISOString() }) {
@@ -56,7 +59,7 @@ export function buildReport({ state, metadata, latest, configurationError, now =
     configurationError: configurationError ? safeCode(configurationError) : null,
     latest: {
       textTest: testSnapshot(latest?.textTest), quota: quotaSnapshot(latest?.quota),
-      error: latest?.error ? errorSnapshot(latest.error.action, latest.error.code, latest.error.at) : null,
+      error: latest?.error ? errorSnapshot(latest.error.action, latest.error.code, latest.error.at, latest.error.quotaFailure) : null,
     },
   };
 }

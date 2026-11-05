@@ -273,6 +273,10 @@ window.__ModuleLoader__.load({
               throw Object.assign(new Error('malformed'), { localKey: 'malformed' });
             }
             if (saved) dirtyRef.current = false;
+            if (state && state.revision !== next.revision) {
+              setQuota(null);
+              setDiagnostic(null);
+            }
             setState(next);
             if (!dirtyRef.current) {
               draftRevision.current = next.revision;

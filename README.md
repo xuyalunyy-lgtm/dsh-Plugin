@@ -7,24 +7,25 @@
 | 目录 | 当前版本 | 功能 | 使用说明 |
 | --- | --- | --- | --- |
 | `dsh-codex-break-defense` | 1.4.0 | Codex 开发约束与防御性冗余提醒 | [README](./dsh-codex-break-defense/README.md) |
-| `dsh-codex-manager` | 0.6.0 | Codex 现有连接、Fast、配额、自动 / 固定代理和脱敏诊断管理 | [README](./dsh-codex-manager/README.md) |
-| `dsh-codex-subscription` | 0.2.2 | `dsh-llm-codex` 订阅模型适配器，支持 Windows 静态系统代理 | [README](./dsh-codex-subscription/README.md) |
+| `dsh-codex-manager` | 0.7.0 | Codex 现有连接、Fast、配额、自动 / 固定代理和脱敏诊断管理 | [README](./dsh-codex-manager/README.md) |
+| `dsh-codex-subscription` | 0.2.4 | `dsh-llm-codex` 订阅模型适配器，统一代理绕过与宿主错误身份，改进请求生命周期 | [README](./dsh-codex-subscription/README.md) |
 | `dsh-desktop-quick-actions` | 0.1.1 | Windows Desktop 重启确认菜单补丁 | [README](./dsh-desktop-quick-actions/README.md) |
 | `dsh-document-search` | 0.4.0 | 当前 PDF / Markdown 文档全文搜索与定位 | [README](./dsh-document-search/README.md) |
 | `dsh-focus-calendar` | 1.3.0 | 待办、专注计时、健康提醒与备份恢复 | [README](./dsh-focus-calendar/README.md) |
 | `dsh-git-visualizer` | 0.6.0 | Git 多仓库检索、差异、提交、分支及安全同步 | [README](./dsh-git-visualizer/README.md) |
 | `dsh-open-in-app-fix` | 独立脚本 | Windows 在 VS Code 中打开的环境变量修复 | [README](./dsh-open-in-app-fix/README.md) |
-| `dsh-qinglan-theme` | 1.5.5 | 青岚主题、柔和配色、本地背景及表单 / 原生控件配色修复 | [README](./dsh-qinglan-theme/README.md) |
-| `dsh-session-manager` | 1.4.0 | 会话迁移、可恢复归档、工作区隐藏及记住偏好的独立侧栏 | [README](./dsh-session-manager/README.md) |
+| `dsh-qinglan-theme` | 1.6.0 | 青岚主题、柔和配色、本地背景及设置布局 / 原生控件配色 | [README](./dsh-qinglan-theme/README.md) |
+| `dsh-session-manager` | 1.5.1 | 多状态侧栏、迁移恢复、归档 / 恢复、重连与按页读取；永久删除需配套宿主 | [README](./dsh-session-manager/README.md) |
 | `dsh-embedded-preset` | 1.0.0 | 纯声明式嵌入式开发助手预设；遵循项目约束、最小实现和按需验证 | [预设配置](./dsh-embedded-preset/cordis.patch.yml) |
+| `dsh-session-purge-core` | 限定构建补丁 | 已归档会话永久删除宿主补丁源码；仅适用于审查过的 Desktop 0.2.2-rc.1 构建 | [README](./dsh-session-purge-core/README.md) |
 
 ## SSH 同步与当前发布范围
 
 - 仓库地址：[xuyalunyy-lgtm/dsh-Plugin](https://github.com/xuyalunyy-lgtm/dsh-Plugin)；SSH 地址为 `git@github.com:xuyalunyy-lgtm/dsh-Plugin.git`。贡献者页面仅用于浏览，不能作为 Git 推送地址。
-- 2026-11-04 核对八个独立插件仓库及三个无独立 Git 的源码目录，合集现包含十一个子项目。本次同步 Codex 管理中心 0.6.0、订阅适配器 0.2.2、青岚主题 1.5.5、嵌入式开发预设 1.0.0，以及 VS Code 修复的正确注册方式与当前安装根示例。
+- 2026-11-05 核对八个独立插件仓库及无独立 Git 的源码目录，忽略仅 LF / CRLF 差异；合集现包含十二个子项目。本次同步 Codex 管理中心 0.7.0、订阅适配器 0.2.4、青岚主题 1.6.0、VS Code 修复的 0.2.2-rc.1 精确白名单，以及会话管理器 1.5.1 的重连 / 分页更新；此前本地会话管理与宿主补丁提交一并正常推送。
 - 仅在既有 `main` 发布已审查源码和文档；不创建分支、不改写原提交、不强制推送，也不新增 `history/*` 分支。历史来源及本次同步范围见 [历史整合说明](./HISTORY.md)。
-- 会话管理器保留此前已发布的 1.4.0 独立侧栏快照；本次检查期间出现的新增工作区功能编辑仍留在本地，不纳入此提交，也不从父目录旧副本覆盖它。
-- 代理相关离线测试通过；青岚最小相关测试通过。VS Code 修复已有离线测试、真实启动及用户当前 GUI 点击成功确认；本次只同步部署说明，不上传本机 profile、凭据或用户数据。
+- 会话管理器以合集子目录为维护源，不从父目录旧副本覆盖。宿主永久删除补丁是已提交的限定构建源码，不附带提取运行时、安装归档或候选计划；真实 GUI / 删除验收与隔离测试分开记录，见其安装说明。
+- 本次已有离线测试通过：管理中心 49 项、订阅适配器 13 项及装载契约、青岚 158 项、会话管理器 47 项、宿主补丁隔离套件 56 项，另有 VS Code 修复既有脚本通过。未安装补丁、启动真实编辑器、发起模型联网测试或对真实会话执行永久删除；不上传本机 profile、凭据或用户数据。
 - 后续从本合集现有 `main` 正常推送：`git push origin HEAD:refs/heads/main`。不要把各独立仓库的根树依次推到同一个目标 `main`，否则会丢失合集目录结构或产生非快进冲突。
 
 ## 使用与构建
@@ -36,6 +37,7 @@
 5. `dsh-document-search` 的 `client.js` 和 `src/pdf-assets.json` 是可再生的 PDF 支持 bundle，本源码快照不包含这两份构建产物。进入该目录后运行 `npm ci --ignore-scripts`、`npm run build` 生成；构建依赖与第三方声明仍保留。未构建不能直接按其客户端导出安装。
 6. `dsh-codex-subscription/lib/` 以及其他插件直接维护的 `client.js` 是本快照必要的实现入口，已保留；不能一概把 `lib/` 或同名客户端当成可删除产物。
 7. `dsh-desktop-quick-actions` 的 `baseline/`、`staging/` 和原始桌面归档不包含在仓库中。重新生成补丁前，须按照其说明从自己已审查的安装包提取基线，不能跳过版本和哈希校验。
+8. `dsh-session-purge-core` 同样不包含 `staging/runtime`、候选 ASAR 或本机安装计划；现有集成测试需要匹配版本的本地提取运行时。安装脚本要求完全退出 Desktop，并核对固定构建、路径和哈希；它不是官方通用升级包。
 
 ## 快照与安全边界
 

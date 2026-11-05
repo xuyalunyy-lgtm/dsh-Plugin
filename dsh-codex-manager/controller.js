@@ -1,9 +1,8 @@
 import { createHash } from 'node:crypto';
-import { open } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { readCredentialFile, summarizeCredentialData } from './credentials.js';
 import { queryQuota } from './quota.js';
 import { buildReport, errorSnapshot, quotaSnapshot, testSnapshot } from './report.js';
+import { quotaFailureSnapshot } from './diagnostics.js';
 import { detectProxy } from './proxy.js';
 
 const ENTRY = 'dsh-llm-codex';
@@ -16,10 +15,10 @@ const MESSAGES = {
   INVALID_SETTINGS: '代理须为无账号密码的 HTTP(S) 地址；客户端版本和超时须符合范围；Fast 必须为布尔值。',
   EXPRESSION_CONFIG: '配置包含动态表达式，管理中心不会覆盖；请使用原插件配置页。',
   BUSY: '已有管理操作进行中，请稍后再试。', CLOSED: '管理插件已停止。',
-  MODEL_REQUIRED: '请先刷新目录，并选择其中的模型。', TIMEOUT: '测试超时，请检查代理与服务状态。',
+  MODEL_REQUIRED: '请先刷新目录，并选择其中的模型。', TIMEOUT: '操作等待已结束或已取消；额度查询总时限为 20 秒，文本测试为 45 秒，与模型流空闲超时无关。',
   AUTH: '凭证未获服务端接受，请在 Codex CLI 中重新登录。', MISSING_CREDENTIAL: '未找到有效凭证，请先在 Codex CLI 登录。',
   RATE_LIMIT: '账号额度或请求频率受限，请稍后重试。', INVALID_REQUEST_PROVIDER: '服务端拒绝测试请求，请核对模型与客户端版本。',
-  TRANSPORT: '连接失败，请检查本地代理及网络。', SERVER: '服务端暂时不可用。',
+  TRANSPORT: '请求发送或响应读取失败；此错误不等于代理配置有误，也不一定是超时。', SERVER: '服务端暂时不可用。',
   QUOTA_FORMAT: '额度接口未返回可识别的数据，请稍后手动刷新。',
   QUOTA_UNAVAILABLE: '当前账号暂不支持此额度接口。', QUOTA_TRANSPORT: '无法复用现有适配器网络连接，请检查适配器安装。',
   FAILED: '操作失败；未输出原始异常，避免泄露凭证与本机路径。',
@@ -48,6 +47,7 @@ export function validateSettings(value) {
   const { proxy, clientVersion, streamIdleTimeoutMs } = value;
   if (typeof proxy !== 'string' || proxy.length > 512 || proxy !== proxy.trim()) fail('INVALID_SETTINGS');
   if (proxy) {
+    if (/[\s\\]/.test(proxy)) fail('INVALID_SETTINGS');
     let url;
     try { url = new URL(proxy); } catch (error) { fail('INVALID_SETTINGS'); }
     if (!['http:', 'https:'].includes(url.protocol) || !url.hostname || url.username || url.password || url.search || url.hash || url.pathname !== '/') fail('INVALID_SETTINGS');
@@ -60,47 +60,25 @@ export function validateSettings(value) {
 /** Read only credential presence/mode. No token, account id, path or raw error leaves this method. */
 export async function readCredential(raw) {
   if (hasExpression(raw.authFile)) fail('EXPRESSION_CONFIG');
-  const file = raw.authFile || join(process.env.CODEX_HOME || join(homedir(), '.codex'), 'auth.json');
-  let handle;
-  try {
-    handle = await open(file, 'r');
-    const info = await handle.stat();
-    if (!info.isFile() || info.size > 262144) fail('MISSING_CREDENTIAL');
-    const buffer = Buffer.alloc(262145);
-    const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
-    if (bytesRead > 262144) fail('MISSING_CREDENTIAL');
-    try { return JSON.parse(buffer.subarray(0, bytesRead).toString('utf8')); } catch (error) { fail('MISSING_CREDENTIAL'); }
-  } catch (error) { fail('MISSING_CREDENTIAL'); }
-  finally { if (handle) await handle.close(); }
+  try { return await readCredentialFile(raw); }
+  catch { fail('MISSING_CREDENTIAL'); }
 }
 export async function credentialSummary(raw) {
   if (hasExpression(raw.authFile)) return { state: 'unavailable', mode: 'unknown' };
-  const file = raw.authFile || join(process.env.CODEX_HOME || join(homedir(), '.codex'), 'auth.json');
-  let handle;
-  try {
-    handle = await open(file, 'r');
-    const info = await handle.stat();
-    if (!info.isFile() || info.size > 262144) return { state: 'invalid', mode: 'unknown' };
-    const buffer = Buffer.alloc(262145);
-    const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
-    if (bytesRead > 262144) return { state: 'invalid', mode: 'unknown' };
-    let auth;
-    try { auth = JSON.parse(buffer.subarray(0, bytesRead).toString('utf8')); }
-    catch (error) { return { state: 'invalid', mode: 'unknown' }; }
-    const key = typeof auth?.OPENAI_API_KEY === 'string' && auth.OPENAI_API_KEY.trim().length > 0;
-    const token = typeof auth?.tokens?.access_token === 'string' && auth.tokens.access_token.length > 0;
-    if (auth?.auth_mode === 'apikey' || (!auth?.auth_mode && key && !token)) return { state: key ? 'present' : 'invalid', mode: 'apikey' };
-    if (auth?.auth_mode === 'chatgpt' || token) return { state: token ? 'present' : 'invalid', mode: 'chatgpt' };
-    return { state: 'invalid', mode: 'unknown' };
-  } catch (error) {
-    return { state: error?.code === 'ENOENT' ? 'missing' : 'unavailable', mode: 'unknown' };
-  } finally { if (handle) await handle.close(); }
+  try { return summarizeCredentialData(await readCredentialFile(raw)); }
+  catch (error) {
+    const state = error?.code === 'ENOENT' ? 'missing' : error?.code === 'INVALID_CREDENTIAL' || error instanceof SyntaxError ? 'invalid' : 'unavailable';
+    return { state, mode: 'unknown' };
+  }
 }
 function safeFailure(error, signal) {
   let code = signal?.aborted ? 'TIMEOUT' : String(error?.code ?? 'FAILED');
   if (code === 'INVALID_REQUEST' && !(error instanceof ManagerError)) code = 'INVALID_REQUEST_PROVIDER';
   if (!Object.hasOwn(MESSAGES, code)) code = 'FAILED';
-  return { ok: false, code, error: MESSAGES[code] };
+  const quotaFailure = quotaFailureSnapshot(error?.quotaFailure);
+  const stage = { transport: '传输初始化', request: '等待响应头', body: '读取响应体' }[quotaFailure?.stage];
+  const detail = quotaFailure ? ` 额度失败阶段：${stage}；底层码：${quotaFailure.networkCode}；耗时：${quotaFailure.elapsedMs ?? '未知'} 毫秒。` : '';
+  return { ok: false, code, error: MESSAGES[code] + detail, ...(quotaFailure ? { quotaFailure } : {}) };
 }
 function assertRequest(request) {
   if (!plain(request) || !['status', 'models', 'saveSettings', 'test', 'quota', 'report'].includes(request.action)) fail('INVALID_REQUEST');
@@ -162,10 +140,12 @@ export function createController({ llm, configEditor, summarizeCredential = cred
     if (callerSignal) signals.push(callerSignal);
     const signal = AbortSignal.any(signals);
     try {
+      signal.throwIfAborted();
       if (request.action === 'saveSettings') {
         const next = validateSettings(request.settings);
         if (typeof request.expectedRevision !== 'string') fail('INVALID_REQUEST');
         await configEditor.edit(entry(), current => {
+          signal.throwIfAborted();
           if (hasExpression(current)) fail('EXPRESSION_CONFIG');
           if (revisionOf(current) !== request.expectedRevision) fail('CONFLICT');
           return { ...current, ...next }; // preserve authFile/writeBack/staticModels and unknown owned fields
@@ -231,7 +211,7 @@ export function createController({ llm, configEditor, summarizeCredential = cred
   function dispatch(request, signal) {
     const work = operate(request, signal).catch(error => safeFailure(error)).then(result => {
       if (request?.action !== 'report' && result?.ok === false) {
-        latest.error = errorSnapshot(request?.action, result.code, new Date().toISOString());
+        latest.error = errorSnapshot(request?.action, result.code, new Date().toISOString(), result.quotaFailure);
         if (request?.action === 'quota') latest.quota = null;
       }
       if (request?.action === 'test' && result?.diagnostic) {

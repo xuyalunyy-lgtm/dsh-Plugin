@@ -295,16 +295,19 @@ export function createController(ctx, receipts, { now = Date.now, visibility } =
     const workspaces = workspaceViews(visibleState);
     const hidden = new Set(visibleState.hiddenWorkspaceIds);
     const archived = new Set(state.archivedSessionIds);
-    // Native list includes cold sessions and excludes subagent-only ownership.
+    // Resolve membership once, rather than scanning every workspace per row.
+    const membership = new Map();
+    for (const workspace of ctx.workspaceRegistry.list()) for (const id of workspace.sessionIds) if (!membership.has(id)) membership.set(id, workspace.id);
+    const candidates = catalog.items.filter(summary => {
+      const workspaceId = membership.get(summary.sessionId);
+      return (!request.sessionId || summary.sessionId === request.sessionId) && summary.origin !== 'subagent' && (request.includeHidden || !workspaceId || !hidden.has(workspaceId)) && (!request.workspaceId || workspaceId === request.workspaceId) && archived.has(summary.sessionId) === (request.archived ?? false);
+    }).sort((a,b) => b.updatedAt - a.updatedAt || a.sessionId.localeCompare(b.sessionId));
+    // Text searches need derived titles/cwd; ordinary pages only inspect their rows.
+    const page = request.query ? candidates : candidates.slice(request.offset, request.offset + request.limit);
     let rows = [];
-    for (const summary of catalog.items) {
+    for (const summary of page) {
       signal?.throwIfAborted();
-      if (request.sessionId && summary.sessionId !== request.sessionId) continue;
-      if (summary.origin === 'subagent') continue;
-      const workspaceId = workspaceFor(summary.sessionId)?.id;
-      if (!request.includeHidden && workspaceId && hidden.has(workspaceId)) continue;
-      if (request.workspaceId && workspaceId !== request.workspaceId) continue;
-      if (archived.has(summary.sessionId) !== (request.archived ?? false)) continue;
+      const workspaceId = membership.get(summary.sessionId);
       try {
         const live = ctx.sessions.get(summary.sessionId);
         const stored = live && !archived.has(summary.sessionId) ? undefined : await ctx.sessionPersistence.stat(summary.sessionId);
@@ -331,7 +334,7 @@ export function createController(ctx, receipts, { now = Date.now, visibility } =
       }
     }
     rows.sort((a,b) => b.updatedAt - a.updatedAt || a.sessionId.localeCompare(b.sessionId));
-    return { ok: true, workspaces, visibilityRevision: visibleState.revision, items: rows.slice(request.offset, request.offset + request.limit), total: rows.length, offset: request.offset, limit: request.limit };
+    return { ok: true, workspaces, visibilityRevision: visibleState.revision, items: request.query ? rows.slice(request.offset, request.offset + request.limit) : rows, total: request.query ? rows.length : candidates.length, offset: request.offset, limit: request.limit };
   }
   async function save(id, receipt) {
     try { await receipts.put(id, clone(receipt)); }
