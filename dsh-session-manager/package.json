@@ -1,6 +1,6 @@
 {
   "name": "dsh-session-manager",
-  "version": "1.4.0",
+  "version": "1.5.1",
   "private": true,
   "type": "module",
   "description": "会话管理：多选批量归档、空会话识别、工作区隐藏/显示、新建、安全迁移历史及恢复。",

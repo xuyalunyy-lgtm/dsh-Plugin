@@ -20,8 +20,10 @@ function fixture(events = []) {
   const workspaces = ['one','two'].map((id,index) => ({ id, title: id, path: `D:\\workspace${index}`, sessionIds: index === 0 ? ['source'] : [], async status() { return failures.missingDir ? 'missing-dir' : 'ok'; }, async attachSession(id) { calls.push(['attach',id]); if (failures.attach) throw Error('attach'); if (stored.get(id).header.cwd !== this.path) throw Error('immutable cwd mismatch'); if (!this.sessionIds.includes(id)) this.sessionIds.push(id); } }));
   function add(id, events, extra = {}) { stored.set(id, { header: { version: 4, id, createdAt: 1, cwd: workspaces[0].path, isSeeded: false, agentPreset: 'main', ...extra }, inheritedEventCount: 0, events: copy(events), revision: ++revision }); }
   add('source', events);
-  const handle = id => ({
-    async read() { return { events: copy(stored.get(id).events) }; },
+  const handle = (id, access = 'write') => ({
+    get header() { return copy(stored.get(id).header); },
+    get inheritedEventCount() { return stored.get(id).inheritedEventCount; },
+    async read() { const row = stored.get(id); if (access === 'read') validateStoredSeed(row); return { events: copy(row.events) }; },
     async append(events) { calls.push(['append',id]); if (failures.append) { const first = events.slice(0,1); stored.get(id).events.push(...copy(first)); throw Error('append failed'); } stored.get(id).events.push(...copy(events)); stored.get(id).revision = ++revision; },
     async flush() { calls.push(['flush',id]); if (failures.flush) throw Error('flush'); },
     async close() { calls.push(['close',id]); if (failures.close) throw Error('close'); },
@@ -35,15 +37,28 @@ function fixture(events = []) {
       async pinSession(id) { pinned.add(id); },
     },
     workspaceController: { async *follow() { yield { type: 'baseline', value: { items: [], archivedSessionIds: [...archived], pinnedSessionIds: [...pinned] } }; } },
+    sessionQuery: {
+      async observeSession(id) {
+        calls.push(['observe',id]);
+        const row = ctx.sessions.get(id);
+        if (!row) throw Error('not live');
+        return { source: 'live', header: copy(row.header), events: copy(row.events), inheritedEventCount: row.inheritedEventCount, [Symbol.dispose]() { calls.push(['dispose',id]); } };
+      },
+    },
     sessionController: {
       async list() { return { items: [...stored].map(([id, row]) => ({ sessionId: id, cwd: row.header.cwd, updatedAt: 10, running: agents.get(id)?.status === 'running', projections: { values: {} } })) }; },
-      async inspect(id) { calls.push(['inspect',id]); const row = stored.get(id); if (!row) throw Error('not found'); validateStoredSeed(row); return { meta: copy(row.header), events: copy(row.events), inheritedEventCount: row.inheritedEventCount }; },
       async create({ workspaceId, sessionId }) { calls.push(['create',sessionId]); add(sessionId, [], { cwd: workspaces.find(w => w.id === workspaceId).path }); if (failures.create) throw Error('created but response failed'); return { sessionId }; },
     },
     sessionPersistence: {
-      async stat(id) { const row = stored.get(id); return row && { header: copy(row.header), revision: String(row.revision), eventCount: row.events.length }; },
+      async stat(id) {
+        const row = stored.get(id);
+        if (!row) return undefined;
+        // JSONL stat reconstructs key order and fills the delegation default.
+        const header = row.header;
+        return { header: { version: header.version, id: header.id, createdAt: header.createdAt, ...(header.cwd === undefined ? {} : { cwd: header.cwd }), ...(header.parentSession === undefined ? {} : { parentSession: header.parentSession }), isSeeded: header.isSeeded, ...(header.origin === undefined ? {} : { origin: header.origin }), delegationDepth: header.delegationDepth ?? 0, ...(header.agentPreset === undefined ? {} : { agentPreset: header.agentPreset }) }, revision: String(row.revision), eventCount: row.events.length };
+      },
       async create(header, options) { calls.push(['persist-create',header.id]); if (stored.has(header.id)) throw Error('exists'); stored.set(header.id,{header:copy(header), events:[], inheritedEventCount:options.inheritedEventCount, revision:++revision}); return handle(header.id); },
-      async open(id) { return handle(id); }, async flush() {},
+      async open(id, access) { if (!stored.has(id)) throw Error('not found'); if (access === 'read') calls.push(['inspect',id]); return handle(id, access); }, async flush() {},
     },
     sessions: { get() {}, async flush() {} },
     agents: { get: id => agents.get(id), list: () => [...agents.values()] },
@@ -353,7 +368,50 @@ test('HTTP owner dispatch shares contract and rejects invalid content/oversized 
   const bad=response();await handler(request({},{}),bad);assert.equal(bad.status,415);
   const large=response();await handler(request({query:'a'.repeat(17000)}),large);assert.equal(large.status,413);
 });
+test('purge refuses an unpatched host without reserving a receipt', async () => {
+  const f=fixture(); f.archived.add('source');
+  const row=(await f.controller.dispatch({action:'list',archived:true})).items[0];
+  assert.equal(row.purgeRevision,undefined);
+  const result=await f.controller.dispatch({action:'purge',sessionId:'source',expectedToken:row.token,expectedStorageRevision:'1',requestId:'purge-unsupported-0001'});
+  assert.equal(result.code,'UNSUPPORTED_RUNTIME'); assert.equal(f.receipts.size,0); assert.ok(f.stored.has('source'));
+});
+test('purge retries a lost response after logs disappear using the original frozen request', async () => {
+  const f=fixture(); f.archived.add('source'); let committed; let calls=0;
+  f.ctx.workspaceRegistry.purgeArchivedSession=async request=>{
+    calls++; if(committed){assert.deepEqual(request,committed);return;}
+    committed=copy(request); f.stored.delete(request.sessionId); f.archived.delete(request.sessionId);
+    throw Object.assign(Error('response lost'),{purgeCommitted:true});
+  };
+  const row=(await f.controller.dispatch({action:'list',archived:true})).items[0];
+  const request={action:'purge',sessionId:'source',expectedToken:row.token,expectedStorageRevision:row.purgeRevision,requestId:'purge-response-lost-001'};
+  assert.equal((await f.controller.dispatch(request)).code,'WRITE_UNCERTAIN');
+  const restarted=createController(f.ctx,f.receiptTable);
+  const result=await restarted.dispatch(request); assert.equal(result.ok,true); assert.equal(calls,2);
+  assert.deepEqual(await restarted.dispatch(request),result); assert.equal(calls,2);
+  assert.equal((await restarted.dispatch({...request,expectedStorageRevision:'changed'})).code,'REQUEST_ID_REUSED');
+});
+test('concurrent identical purge requests invoke the host once', async () => {
+  const f=fixture();f.archived.add('source');let calls=0;
+  f.ctx.workspaceRegistry.purgeArchivedSession=async request=>{calls++;f.stored.delete(request.sessionId);};
+  const row=(await f.controller.dispatch({action:'list',archived:true})).items[0];
+  const request={action:'purge',sessionId:'source',expectedToken:row.token,expectedStorageRevision:row.purgeRevision,requestId:'purge-concurrent-001'};
+  const [a,b]=await Promise.all([f.controller.dispatch(request),f.controller.dispatch(request)]);
+  assert.equal(a.ok,true);assert.deepEqual(a,b);assert.equal(calls,1);
+});
+test('purge requires archived state before invoking the host', async () => {
+  const f=fixture();let calls=0;f.ctx.workspaceRegistry.purgeArchivedSession=async()=>{calls++;};
+  const request={action:'purge',sessionId:'source',expectedToken:await f.token(),expectedStorageRevision:'1',requestId:'purge-active-refused-001'};
+  assert.equal((await f.controller.dispatch(request)).code,'INVALID_STATE');assert.equal(calls,0);assert.ok(f.stored.has('source'));
+});
+test('purge definite precommit refusal settles without deleting and remains replayable', async () => {
+  const f=fixture();f.archived.add('source');let calls=0;
+  f.ctx.workspaceRegistry.purgeArchivedSession=async()=>{calls++;throw Object.assign(Error('会话仍被引用'),{code:'PURGE_REFERENCED',purgeCommitted:false});};
+  const row=(await f.controller.dispatch({action:'list',archived:true})).items[0];
+  const request={action:'purge',sessionId:'source',expectedToken:row.token,expectedStorageRevision:row.purgeRevision,requestId:'purge-refused-00001'};
+  const result=await f.controller.dispatch(request);assert.equal(result.code,'PURGE_REFERENCED');assert.ok(f.stored.has('source'));
+  assert.deepEqual(await f.controller.dispatch(request),result);assert.equal(calls,1);
+});
 test('plugin registers shared service, tool and exact owner-auth HTTP route',async()=>{
   // Test apply's shape without depending on a profile-installed zod module.
-  assert.equal(typeof apply,'function');assert.equal(parameters.properties.action.enum.length,7);assert.equal(parameters.additionalProperties,false);
+  assert.equal(typeof apply,'function');assert.equal(parameters.properties.action.enum.length,9);assert.equal(parameters.additionalProperties,false);
 });

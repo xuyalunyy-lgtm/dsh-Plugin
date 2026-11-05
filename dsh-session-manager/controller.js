@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-export const ACTIONS = ['list', 'create', 'move', 'delete', 'restore', 'setWorkspaceVisibility', 'batchDelete'];
+export const ACTIONS = ['list', 'create', 'move', 'delete', 'archive', 'restore', 'purge', 'setWorkspaceVisibility', 'batchDelete'];
 const MAX_RECEIPTS = 4096;
 const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const clone = value => structuredClone(value);
@@ -12,7 +12,7 @@ const resultError = error => ({ ok: false, code: error instanceof Failure ? erro
 const clean = value => String(value ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 300);
 function validate(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input) || !ACTIONS.includes(input.action)) fail('INVALID_REQUEST', '无效的会话管理操作。');
-  const allowed = input.action === 'list' ? ['action','query','workspaceId','archived','includeHidden','offset','limit'] : input.action === 'setWorkspaceVisibility' ? ['action','workspaceId','hidden','expectedVisibilityRevision','requestId'] : input.action === 'batchDelete' ? ['action','items','requestId'] : ['action','workspaceId','sessionId','expectedToken','requestId'];
+  const allowed = input.action === 'list' ? ['action','query','sessionId','workspaceId','archived','includeHidden','offset','limit'] : input.action === 'setWorkspaceVisibility' ? ['action','workspaceId','hidden','expectedVisibilityRevision','requestId'] : input.action === 'batchDelete' ? ['action','items','requestId'] : input.action === 'purge' ? ['action','sessionId','expectedToken','expectedStorageRevision','requestId'] : ['action','workspaceId','sessionId','expectedToken','requestId'];
   if (Object.keys(input).some(key => !allowed.includes(key))) fail('INVALID_REQUEST', '请求包含不允许的参数。');
   const request = Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
   for (const key of ['sessionId','workspaceId','expectedToken','requestId']) if (request[key] !== undefined && (typeof request[key] !== 'string' || !request[key] || request[key].length > 256 || /[\u0000-\u001f]/.test(request[key]))) fail('INVALID_REQUEST', '会话标识、工作区或请求凭证无效。');
@@ -44,10 +44,11 @@ function validate(input) {
     if (!Number.isSafeInteger(request.expectedVisibilityRevision) || request.expectedVisibilityRevision < 0) fail('INVALID_REQUEST', '请先读取工作区显示状态并提交其版本号。');
     return request;
   }
+  if (request.action === 'purge' && (typeof request.expectedStorageRevision !== 'string' || !request.expectedStorageRevision || request.expectedStorageRevision.length > 256 || /[\u0000-\u001f]/.test(request.expectedStorageRevision))) fail('INVALID_REQUEST', '永久删除需要确认时冻结的存储版本。');
   if (['create','move'].includes(request.action) && !request.workspaceId) fail('INVALID_REQUEST', '请选择目标工作区。');
   if (request.action !== 'create' && (!request.sessionId || !request.expectedToken)) fail('INVALID_REQUEST', '请先读取会话并提交其 expectedToken。');
   if (request.action === 'create' && (request.sessionId || request.expectedToken)) fail('INVALID_REQUEST', '新建会话不接受源会话或状态凭证。');
-  if (['delete','restore'].includes(request.action) && request.workspaceId) fail('INVALID_REQUEST', '删除或恢复不接受目标工作区。');
+  if (['delete','archive','restore'].includes(request.action) && request.workspaceId) fail('INVALID_REQUEST', '删除、归档或恢复不接受目标工作区。');
   return request;
 }
 
@@ -166,8 +167,31 @@ export function createController(ctx, receipts, { now = Date.now, visibility } =
     return target;
   };
   async function inspect(id, signal) {
-    try { return await ctx.sessionController.inspect(id, signal); }
-    catch (error) { fail('SESSION_UNAVAILABLE', `会话不存在、格式不兼容或当前不可读取：${clean(error.message || error)}`); }
+    signal?.throwIfAborted();
+    try {
+      if (!ctx.sessions.get(id)) {
+        // Query cold reads append synthetic interrupted-turn closers. Safety
+        // checks and migration must instead see the validated stored log as-is.
+        const options = { signal };
+        const handle = await ctx.sessionPersistence.open(id, 'read', options);
+        let snapshot;
+        try {
+          const { events } = await handle.read(0, undefined, options);
+          snapshot = clone({ meta: handle.header, events, inheritedEventCount: handle.inheritedEventCount });
+        } finally { await handle.close(); }
+        signal?.throwIfAborted();
+        // Prefer unflushed live events if the session attached during the read.
+        if (!ctx.sessions.get(id)) return snapshot;
+      }
+      const observation = await ctx.sessionQuery.observeSession(id, { signal, projectionMode: 'none' });
+      try {
+        signal?.throwIfAborted();
+        return clone({ meta: observation.header, events: observation.events, inheritedEventCount: observation.inheritedEventCount });
+      } finally { observation[Symbol.dispose](); }
+    } catch (error) {
+      signal?.throwIfAborted();
+      fail('SESSION_UNAVAILABLE', `会话不存在、格式不兼容或当前不可读取：${clean(error.message || error)}`);
+    }
   }
   function activityMessage(activities) {
     const kinds = new Set(activities.map(activity => activity.kind));
@@ -246,7 +270,7 @@ export function createController(ctx, receipts, { now = Date.now, visibility } =
         throw error;
       }
       let observed;
-      try { observed = await ctx.sessionController.inspect(child.id); }
+      try { observed = await inspect(child.id); }
       catch {
         if (live || child.live) fail('STATE_UNAVAILABLE', `无法核对活动子智能体 ${clean(child.label || child.id)} 的待处理输入，请稍后重试。`);
         continue; // stale cold historical child: no transfer and no resurrection
@@ -274,6 +298,8 @@ export function createController(ctx, receipts, { now = Date.now, visibility } =
     // Native list includes cold sessions and excludes subagent-only ownership.
     let rows = [];
     for (const summary of catalog.items) {
+      signal?.throwIfAborted();
+      if (request.sessionId && summary.sessionId !== request.sessionId) continue;
       if (summary.origin === 'subagent') continue;
       const workspaceId = workspaceFor(summary.sessionId)?.id;
       if (!request.includeHidden && workspaceId && hidden.has(workspaceId)) continue;
@@ -281,7 +307,9 @@ export function createController(ctx, receipts, { now = Date.now, visibility } =
       if (archived.has(summary.sessionId) !== (request.archived ?? false)) continue;
       try {
         const live = ctx.sessions.get(summary.sessionId);
-        const version = live ? `live:${live.seq}` : `stored:${(await ctx.sessionPersistence.stat(summary.sessionId))?.revision}`;
+        const stored = live && !archived.has(summary.sessionId) ? undefined : await ctx.sessionPersistence.stat(summary.sessionId);
+        const version = live ? `live:${live.seq}` : `stored:${stored?.revision}`;
+        const purgeRevision = ctx.agents.get(summary.sessionId)?.status !== 'running' && stored && archived.has(summary.sessionId) && typeof ctx.workspaceRegistry.purgeArchivedSession === 'function' ? stored.revision : undefined;
         let cached = summaries.get(summary.sessionId);
         if (!cached || cached.version !== version) {
           const inspection = await inspect(summary.sessionId, signal);
@@ -291,7 +319,7 @@ export function createController(ctx, receipts, { now = Date.now, visibility } =
         }
         const { title, cwd } = cached;
         if (request.query && !`${title}\n${summary.sessionId}\n${cwd}`.toLocaleLowerCase().includes(request.query.toLocaleLowerCase())) continue;
-        rows.push({ sessionId: summary.sessionId, title, cwd, empty: cached.empty, ...(workspaceId ? { workspaceId } : {}), running: Boolean(summary.running || ctx.agents.get(summary.sessionId)?.status === 'running'), archived: archived.has(summary.sessionId), updatedAt: summary.updatedAt, token: tokenForDigest(cached.digest, summary.sessionId, state, workspaceId) });
+        rows.push({ sessionId: summary.sessionId, title, cwd, empty: cached.empty, ...(purgeRevision ? { purgeRevision } : {}), ...(workspaceId ? { workspaceId } : {}), running: Boolean(summary.running || ctx.agents.get(summary.sessionId)?.status === 'running'), archived: archived.has(summary.sessionId), updatedAt: summary.updatedAt, token: tokenForDigest(cached.digest, summary.sessionId, state, workspaceId) });
       } catch (error) {
         signal?.throwIfAborted();
         // A damaged/incompatible log is a disabled row, not a reason to hide
@@ -403,12 +431,15 @@ export function createController(ctx, receipts, { now = Date.now, visibility } =
         { type: 'session/end-seed', seq: source.events.length, time: receipt.createdAt, data: { inherited: true } },
         { type: 'working-directory/change', seq: source.events.length + 1, time: receipt.createdAt, data: { cwd: target.path } },
       ];
-      const header = { version: source.meta.version, id: receipt.sessionId, createdAt: receipt.createdAt, cwd: target.path, parentSession: request.sessionId, isSeeded: true, ...(preset === undefined ? {} : { agentPreset: preset }) };
+      const header = { version: source.meta.version, id: receipt.sessionId, createdAt: receipt.createdAt, cwd: target.path, parentSession: request.sessionId, isSeeded: true, delegationDepth: 0, ...(preset === undefined ? {} : { agentPreset: preset }) };
       let handle;
       const stored = await ctx.sessionPersistence.stat(receipt.sessionId);
       if (!stored) handle = await ctx.sessionPersistence.create(header, { inheritedEventCount: source.events.length });
       else {
-        if (hash(stored.header) !== hash(header) || ctx.sessions.get(receipt.sessionId)) fail('RECOVERY_REQUIRED', '目标副本已被修改或打开，禁止覆盖；源会话将恢复。', { sessionId: receipt.sessionId });
+        // Persistence normalizes defaults and field order. Compare every
+        // immutable header field, not the serialization of the whole object.
+        const matchesHeader = ['version','id','createdAt','cwd','parentSession','isSeeded','agentPreset','origin'].every(key => stored.header[key] === header[key]) && (stored.header.delegationDepth ?? 0) === header.delegationDepth;
+        if (!matchesHeader || ctx.sessions.get(receipt.sessionId)) fail('RECOVERY_REQUIRED', '目标副本已被修改或打开，禁止覆盖；源会话将恢复。', { sessionId: receipt.sessionId });
         handle = await ctx.sessionPersistence.open(receipt.sessionId, 'write');
       }
       try {
@@ -532,6 +563,7 @@ export function createController(ctx, receipts, { now = Date.now, visibility } =
   }
   async function mutate(request, { batchRequestId } = {}) {
     if (pendingBatch && request.requestId !== pendingBatch && batchRequestId !== pendingBatch) fail('PENDING', '有批量删除尚未确认完成；请先使用原批量请求凭证重试。');
+    if (request.action === 'purge' && typeof ctx.workspaceRegistry.purgeArchivedSession !== 'function') fail('UNSUPPORTED_RUNTIME', '当前宿主未安装永久删除支持；请先完成本体补丁安装并重启。');
     if (request.action === 'batchDelete') return batchDelete(request);
     if (request.action === 'setWorkspaceVisibility') return setWorkspaceVisibility(request);
     if (uncertainVisibility?.requestId === request.requestId || visibilityState().receipts.some(entry => entry.requestId === request.requestId)) fail('REQUEST_ID_REUSED', '此 requestId 已用于工作区显示设置。');
@@ -545,6 +577,7 @@ export function createController(ctx, receipts, { now = Date.now, visibility } =
       // leave the client free to obtain a fresh token and mint a new request.
       if (request.action !== 'create') {
         const checked = await checkedSource(request, request.action);
+        if (request.action === 'purge' && !checked.state.archivedSessionIds.includes(request.sessionId)) fail('INVALID_STATE', '只能永久删除已归档会话。');
         if (request.action === 'move') {
           const target = await targetFor(request.workspaceId);
           if (checked.state.archivedSessionIds.includes(request.sessionId)) fail('INVALID_STATE', '请先恢复归档会话，再进行移动。');
@@ -562,12 +595,23 @@ export function createController(ctx, receipts, { now = Date.now, visibility } =
       await checkedSource(request, request.action);
       receipt = { ...receipt, stage: 'applying' }; await save(request.requestId, receipt);
     }
-    if (request.action === 'delete') {
+    if (request.action === 'purge') {
+      try {
+        await ctx.workspaceRegistry.purgeArchivedSession({ sessionId: request.sessionId, requestId: request.requestId, expectedRevision: request.expectedStorageRevision });
+      } catch (error) {
+        if (error.purgeCommitted !== false) throw error;
+        return finish(request, receipt, { ok: false, code: error.code || 'PURGE_REFUSED', error: clean(error.message) });
+      }
+      summaries.delete(request.sessionId);
+      return finish(request, receipt, { ok: true, sessionId: request.sessionId, message: '会话原始日志和搜索记录已永久删除，无法恢复；项目文件未改动。' });
+    }
+    const archiving = request.action === 'delete' || request.action === 'archive';
+    if (archiving) {
       const source = await inspect(request.sessionId);
       await safe(request.sessionId, source, 'delete');
       await ctx.workspaceRegistry.archiveSession(request.sessionId);
     } else await ctx.workspaceRegistry.unarchiveSession(request.sessionId);
-    return finish(request, receipt, { ok: true, sessionId: request.sessionId, message: request.action === 'delete' ? '会话已可恢复归档；未永久删除历史，可在归档列表恢复。' : '会话已从归档恢复。' });
+    return finish(request, receipt, { ok: true, sessionId: request.sessionId, message: archiving ? '会话已可恢复归档；未永久删除历史，可在归档列表恢复。' : '会话已从归档恢复。' });
   }
   function dispatch(input, { signal } = {}) {
     if (closing) return Promise.resolve({ ok: false, code: 'UNAVAILABLE', error: '插件正在关闭，请稍后重试。' });

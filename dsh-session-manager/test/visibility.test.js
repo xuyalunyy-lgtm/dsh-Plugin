@@ -15,9 +15,14 @@ function fixture() {
     workspaceController: {async *follow(){yield {type:'baseline',value:{archivedSessionIds:[],pinnedSessionIds:[]}};}},
     sessionController: {
       async list(){return {items:['source','other'].map((sessionId,index)=>({sessionId,cwd:workspaces[index].path,updatedAt:index+1}))};},
-      async inspect(id){calls.push(id);return {meta:{id,version:4,isSeeded:false,cwd:id==='source'?'D:\\one':'D:\\two'},inheritedEventCount:0,events:[]};},
     },
-    sessionPersistence:{async stat(){return {revision:'1'};}},sessions:{get(){}},agents:{get(){}},
+    sessionPersistence:{
+      async stat(){return {revision:'1'};},
+      async open(id,access){
+        assert.equal(access,'read');calls.push(id);
+        return {header:{id,version:4,isSeeded:false,cwd:id==='source'?'D:\\one':'D:\\two'},inheritedEventCount:0,async read(){return {events:[]};},async close(){}};
+      },
+    },sessions:{get(){}},agents:{get(){}},
   };
   const controller=createController(ctx,receipts,{visibility});
   const action=(workspaceId,hidden,expectedVisibilityRevision,requestId='visibility-req-0001')=>({action:'setWorkspaceVisibility',workspaceId,hidden,expectedVisibilityRevision,requestId});
