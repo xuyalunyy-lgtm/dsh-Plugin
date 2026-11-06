@@ -6,7 +6,7 @@
 
 - [管理手册](<MANAGEMENT.md>)：唯一维护源、安装方式、云端发布流程及本轮审查结果。
 - [发布清单](<plugins.json>) / [管理脚本](<manage.mjs>)：`node manage.mjs check` 默认只读；`sync --plugin <id>` 显式同步，不自动提交、推送、安装或删除文件。
-- [DSH 本体更新方案](<DSH-UPDATES.md>)：当前自动下载 / 退出安装已关闭，但后台检查仍运行；本轮按用户选择暂不修改更新机制，也不拉取或升级本体。
+- [DSH 本体更新方案](<DSH-UPDATES.md>) / [更新禁用候选](<dsh-desktop-update-policy/README.md>)：已按用户授权实现显式开关并生成精确构建候选，隔离检查通过；尚需完全退出后的外部安装和重启观察，当前运行进程仍未修改。
 
 ## 插件索引
 
@@ -24,11 +24,12 @@
 | `dsh-session-manager` | 1.5.1 | 多状态侧栏、迁移恢复、归档 / 恢复、重连与按页读取；永久删除需配套宿主 | [README](./dsh-session-manager/README.md) |
 | `dsh-embedded-preset` | 1.0.0 | 纯声明式嵌入式开发助手预设；遵循项目约束、最小实现和按需验证 | [预设配置](./dsh-embedded-preset/cordis.patch.yml) |
 | `dsh-session-purge-core` | 限定构建补丁 | 已归档会话永久删除宿主补丁源码；仅适用于审查过的 Desktop 0.2.2-rc.1 构建 | [README](./dsh-session-purge-core/README.md) |
+| `dsh-desktop-update-policy` | 限定构建候选 | 关闭普通 / 策略检查与手动下载安装，默认禁用，可显式恢复 | [README](./dsh-desktop-update-policy/README.md) |
 
 ## SSH 同步与当前发布范围
 
 - 仓库地址：[xuyalunyy-lgtm/dsh-Plugin](https://github.com/xuyalunyy-lgtm/dsh-Plugin)；SSH 地址为 `git@github.com:xuyalunyy-lgtm/dsh-Plugin.git`。贡献者页面仅用于浏览，不能作为 Git 推送地址。
-- 2026-11-06 管理整理：保留十二个项目的现有路径，建立唯一维护源与发布清单、默认只读的 `check / sync` 工具；订阅适配器更新至 0.2.5，修复切换模型缓存文件后仍命中旧目录的问题。此前 Git 工作台 0.8.0 及 2026-11-05 的更新记录保留在历史说明中。
+- 2026-11-06 管理整理：保留既有十二个项目的路径，并新增第十三项更新策略候选；建立唯一维护源与发布清单、默认只读的 `check / sync` 工具；订阅适配器更新至 0.2.5，修复切换模型缓存文件后仍命中旧目录的问题。此前 Git 工作台 0.8.0 及 2026-11-05 的更新记录保留在历史说明中。
 - 仅在既有 `main` 发布已审查源码和文档；不创建分支、不改写原提交、不强制推送，也不新增 `history/*` 分支。历史来源及本次同步范围见 [历史整合说明](./HISTORY.md)。
 - 会话管理器以合集子目录为维护源，不从父目录旧副本覆盖。宿主永久删除补丁是已提交的限定构建源码，不附带提取运行时、安装归档或候选计划；真实 GUI / 删除验收与隔离测试分开记录，见其安装说明。
 - 本轮适配器现有 **13 项离线测试及装载契约通过**；缓存文件切换专项动态覆盖仍有限，不将既有回归当作运行中 Host 已重载的证明。管理工具只用于实际检查 / 指定同步，不安装插件或改 profile。Git 工作台此前 **124/124** 完整回归及其他项目证据保留在历史说明，未对无关插件重复全量测试。
@@ -44,6 +45,7 @@
 6. `dsh-codex-subscription/lib/` 以及其他插件直接维护的 `client.js` 是本快照必要的实现入口，已保留；不能一概把 `lib/` 或同名客户端当成可删除产物。
 7. `dsh-desktop-quick-actions` 的 `baseline/`、`staging/` 和原始桌面归档不包含在仓库中。重新生成补丁前，须按照其说明从自己已审查的安装包提取基线，不能跳过版本和哈希校验。
 8. `dsh-session-purge-core` 同样不包含 `staging/runtime`、候选 ASAR 或本机安装计划；现有集成测试需要匹配版本的本地提取运行时。安装脚本要求完全退出 Desktop，并核对固定构建、路径和哈希；它不是官方通用升级包。
+9. `dsh-desktop-update-policy` 只发布变换、准备 / 外部安装脚本及隔离测试，`staging/` 候选与计划不上传。它严格基于当前已补丁归档，不热替换运行进程；安装后默认关闭所有更新入口，实际周期网络观察仍须重启后执行。
 
 ## 快照与安全边界
 

@@ -20,6 +20,7 @@
 | 嵌入式开发预设 | `dsh-embedded-preset/` | 同名子目录 | `link:` 指向维护源 |
 | 会话管理器 | **`dsh-Plugin/dsh-session-manager/`** | 原地维护 | `link:` 指向合集中的该目录 |
 | 永久删除宿主补丁 | **`dsh-Plugin/dsh-session-purge-core/`** | 原地维护 | 限定 Desktop 构建的外部安装补丁 |
+| Desktop 更新策略 | **`dsh-Plugin/dsh-desktop-update-policy/`** | 原地维护 | 更新禁用候选，需完全退出后外部安装 |
 
 工作区根部的 `dsh-session-manager/` 是 **1.3.0 非活动旧副本**，不是维护源、发布源或安装源。不要从它覆盖合集中的 1.5.1。暂时保留该目录、不删除或搬迁；先前项目和会话中可能仍有路径引用。
 
@@ -42,7 +43,7 @@ node manage.mjs check
 node manage.mjs check --plugin dsh-codex-subscription
 ```
 
-默认操作为只读检查：显示源版本、Git 状态及源/合集差异，不安装、修改 profile、提交或推送。Git 维护源仅采用已经跟踪的源码；静态目录采用逐文件清单；原地维护的两项不做外部同步。仅换行符的差异不作为新功能更新。
+默认操作为只读检查：显示源版本、Git 状态及源/合集差异，不安装、修改 profile、提交或推送。Git 维护源仅采用已经跟踪的源码；静态目录采用逐文件清单；原地维护项目不做外部同步。仅换行符的差异不作为新功能更新。
 
 需要同步时明确选择插件：
 
@@ -93,4 +94,4 @@ git ls-remote origin refs/heads/main
 
 ## 5. DSH 自动更新与后续源码路线
 
-详见 [DSH-UPDATES.md](<DSH-UPDATES.md>)。用户本轮选择：**先给方案，暂不修改 Desktop 更新机制**。不要把检查报告当成已经关闭自动检查，也不要克隆、构建或替换本体后声称只是同步插件。
+详见 [DSH-UPDATES.md](<DSH-UPDATES.md>)。用户已进一步授权实施，[更新禁用候选](<dsh-desktop-update-policy/README.md>) 已生成并通过隔离检查，**尚未安装**；需完全退出 Desktop 后在外部安装并重启观察。不要把候选完成当成当前进程已经关闭更新，也不要把克隆、构建或替换本体称作同步普通插件。

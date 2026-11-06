@@ -2,6 +2,14 @@
 
 首次整合将九个插件或桌面工具的可发布源码放入各自子目录：七个项目已有 Git 历史，两个项目原先没有 Git 仓库。后续移除了 `dsh-agent-orchestrator`，加入 `dsh-codex-break-defense` 和 `dsh-session-manager`，当前合集包含十个子项目。以下首次整合数据保留为历史记录，不代表当前分支、标签或目录清单。
 
+## 2026-11-06：实施 Desktop 更新禁用候选
+
+用户进一步授权实施更新方案，并明确允许新增必要隔离回归。新增 [dsh-desktop-update-policy](<dsh-desktop-update-policy/README.md>)，只针对当前 Desktop 0.2.2-rc.1 / c59d10…、已补丁归档 SHA-256 `12b95a06a6cd37bfe7d0505e8a23afa3e7b26d42e7d5c078b10463e96c13a008`。在原主入口上增加 `updates.enabled`（默认 false）、统一自动检查入口门控、禁用 policy 装配及手动入口 / 菜单，显式 true 后重启保留原行为。
+
+候选归档 `d3a21eeeb96cc3fe7e844f5c773db0ad1abbdd9c2f1bcf6c4f2d387ffd5575a0` 仅追加替换 `lib/main.js`；原 payload 保留，其余既有宿主补丁和 unpacked 资源不变。主入口 / 脚本语法检查通过，新增隔离回归 23/23，复用归档保留检查后 24/24；安装器 CheckOnly 通过，发现当前 DSH 仍在运行，没有执行安装或修改真实设置。
+
+实现源码、安装说明和测试可发布；本机 staging 候选、计划与归档不发布。尚需用户完全退出 Desktop 后从外部安装并正常重启，对启动、聚焦、恢复和超过 10 分钟周期做实际更新请求观察；源码完成不能视作当前运行实例已禁用更新。
+
 ## 2026-11-06：统一管理入口与目录缓存修复
 
 在已发布合集 `e047527a4c86b6072aa49ef0600f2e4e07c8341b` 后建立 [维护源清单](<plugins.json>)、[默认只读 check / 显式 sync 工具](<manage.mjs>) 和 [管理手册](<MANAGEMENT.md>)。现有路径、安装链接和 Git remote 不变；会话管理器及宿主补丁原地维护，父目录 1.3.0 旧会话管理器明确排除。根工作区导航同步更新，但根目录本身不是发布仓库，完整可公开的规则保存在本合集。
