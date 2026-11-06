@@ -20,7 +20,7 @@
 | 嵌入式开发预设 | `dsh-embedded-preset/` | 同名子目录 | `link:` 指向维护源 |
 | 会话管理器 | **`dsh-Plugin/dsh-session-manager/`** | 原地维护 | `link:` 指向合集中的该目录 |
 | 永久删除宿主补丁 | **`dsh-Plugin/dsh-session-purge-core/`** | 原地维护 | 限定 Desktop 构建的外部安装补丁 |
-| Desktop 更新策略 | **`dsh-Plugin/dsh-desktop-update-policy/`** | 原地维护 | 更新禁用候选，需完全退出后外部安装 |
+| Desktop 更新策略 | **`dsh-Plugin/dsh-desktop-update-policy/`** | 原地维护 | 已外部安装重启，归档 hash / 禁用设置核对通过 |
 
 工作区根部的 `dsh-session-manager/` 是 **1.3.0 非活动旧副本**，不是维护源、发布源或安装源。不要从它覆盖合集中的 1.5.1。暂时保留该目录、不删除或搬迁；先前项目和会话中可能仍有路径引用。
 
@@ -94,4 +94,4 @@ git ls-remote origin refs/heads/main
 
 ## 5. DSH 自动更新与后续源码路线
 
-详见 [DSH-UPDATES.md](<DSH-UPDATES.md>)。用户已进一步授权实施，[更新禁用候选](<dsh-desktop-update-policy/README.md>) 已生成并通过隔离检查，**尚未安装**；需完全退出 Desktop 后在外部安装并重启观察。不要把候选完成当成当前进程已经关闭更新，也不要把克隆、构建或替换本体称作同步普通插件。
+详见 [DSH-UPDATES.md](<DSH-UPDATES.md>)。[更新禁用补丁](<dsh-desktop-update-policy/README.md>) 已由用户外部安装并重启，安装 hash 和禁用设置核对通过；侧栏无更新提示，原生菜单与请求级网络观察仍未覆盖。不要把没有提示当作请求级零流量证明，也不要把克隆、构建或替换本体称作同步普通插件。

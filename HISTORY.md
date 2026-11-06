@@ -2,6 +2,10 @@
 
 首次整合将九个插件或桌面工具的可发布源码放入各自子目录：七个项目已有 Git 历史，两个项目原先没有 Git 仓库。后续移除了 `dsh-agent-orchestrator`，加入 `dsh-codex-break-defense` 和 `dsh-session-manager`，当前合集包含十个子项目。以下首次整合数据保留为历史记录，不代表当前分支、标签或目录清单。
 
+## 2026-11-06：用户安装后核对
+
+用户报告已安装并重启。只读核对安装归档 SHA-256 为候选 `d3a21eeeb96cc3fe7e844f5c773db0ad1abbdd9c2f1bcf6c4f2d387ffd5575a0`；Electron shell 设置 `updates.enabled=false`，原 `allowTestAuthPopupWindow=false` 保留；当前 Desktop 主进程启动于 15:58:37。用户确认侧栏无更新提示，尚未找到原生菜单，因此未确认该项；现有日志没有本次请求级观察证据，不宣称已实测启动、聚焦、恢复及周期零更新请求。没有再次安装、改设置或开启额外网络诊断。
+
 ## 2026-11-06：实施 Desktop 更新禁用候选
 
 用户进一步授权实施更新方案，并明确允许新增必要隔离回归。新增 [dsh-desktop-update-policy](<dsh-desktop-update-policy/README.md>)，只针对当前 Desktop 0.2.2-rc.1 / c59d10…、已补丁归档 SHA-256 `12b95a06a6cd37bfe7d0505e8a23afa3e7b26d42e7d5c078b10463e96c13a008`。在原主入口上增加 `updates.enabled`（默认 false）、统一自动检查入口门控、禁用 policy 装配及手动入口 / 菜单，显式 true 后重启保留原行为。

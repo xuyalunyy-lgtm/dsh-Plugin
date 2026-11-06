@@ -6,7 +6,7 @@
 
 - [管理手册](<MANAGEMENT.md>)：唯一维护源、安装方式、云端发布流程及本轮审查结果。
 - [发布清单](<plugins.json>) / [管理脚本](<manage.mjs>)：`node manage.mjs check` 默认只读；`sync --plugin <id>` 显式同步，不自动提交、推送、安装或删除文件。
-- [DSH 本体更新方案](<DSH-UPDATES.md>) / [更新禁用候选](<dsh-desktop-update-policy/README.md>)：已按用户授权实现显式开关并生成精确构建候选，隔离检查通过；尚需完全退出后的外部安装和重启观察，当前运行进程仍未修改。
+- [DSH 本体更新方案](<DSH-UPDATES.md>) / [更新禁用补丁](<dsh-desktop-update-policy/README.md>)：用户已外部安装重启，安装 hash 与 `updates.enabled=false` 核对通过；侧栏无更新提示，原生菜单和请求级网络观察未完成。
 
 ## 插件索引
 
