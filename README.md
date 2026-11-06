@@ -12,7 +12,7 @@
 | `dsh-desktop-quick-actions` | 0.1.1 | Windows Desktop 重启确认菜单补丁 | [README](./dsh-desktop-quick-actions/README.md) |
 | `dsh-document-search` | 0.4.0 | 当前 PDF / Markdown 文档全文搜索与定位 | [README](./dsh-document-search/README.md) |
 | `dsh-focus-calendar` | 1.3.0 | 待办、专注计时、健康提醒与备份恢复 | [README](./dsh-focus-calendar/README.md) |
-| `dsh-git-visualizer` | 0.6.0 | Git 多仓库检索、差异、提交、分支及安全同步 | [README](./dsh-git-visualizer/README.md) |
+| `dsh-git-visualizer` | 0.8.0 | Git 多仓库检索、全引用提交拓扑、有界加载与分页、差异、分支及安全同步 | [README](./dsh-git-visualizer/README.md) |
 | `dsh-open-in-app-fix` | 独立脚本 | Windows 在 VS Code 中打开的环境变量修复 | [README](./dsh-open-in-app-fix/README.md) |
 | `dsh-qinglan-theme` | 1.6.0 | 青岚主题、柔和配色、本地背景及设置布局 / 原生控件配色 | [README](./dsh-qinglan-theme/README.md) |
 | `dsh-session-manager` | 1.5.1 | 多状态侧栏、迁移恢复、归档 / 恢复、重连与按页读取；永久删除需配套宿主 | [README](./dsh-session-manager/README.md) |
@@ -22,10 +22,10 @@
 ## SSH 同步与当前发布范围
 
 - 仓库地址：[xuyalunyy-lgtm/dsh-Plugin](https://github.com/xuyalunyy-lgtm/dsh-Plugin)；SSH 地址为 `git@github.com:xuyalunyy-lgtm/dsh-Plugin.git`。贡献者页面仅用于浏览，不能作为 Git 推送地址。
-- 2026-11-05 核对八个独立插件仓库及无独立 Git 的源码目录，忽略仅 LF / CRLF 差异；合集现包含十二个子项目。本次同步 Codex 管理中心 0.7.0、订阅适配器 0.2.4、青岚主题 1.6.0、VS Code 修复的 0.2.2-rc.1 精确白名单，以及会话管理器 1.5.1 的重连 / 分页更新；此前本地会话管理与宿主补丁提交一并正常推送。
+- 2026-11-06 再次核对八个独立插件仓库及无独立 Git 的维护目录，合集现包含十二个子项目。本次仅 Git 工作台有实质更新：0.6.0 → 0.8.0，全引用提交拓扑、有界加载 / 分页及读取协调修复；其余插件与上次发布内容一致，不重复同步 LF / CRLF 差异。2026-11-05 的管理中心、适配器、主题、会话管理和宿主补丁发布范围保留在历史说明中。
 - 仅在既有 `main` 发布已审查源码和文档；不创建分支、不改写原提交、不强制推送，也不新增 `history/*` 分支。历史来源及本次同步范围见 [历史整合说明](./HISTORY.md)。
 - 会话管理器以合集子目录为维护源，不从父目录旧副本覆盖。宿主永久删除补丁是已提交的限定构建源码，不附带提取运行时、安装归档或候选计划；真实 GUI / 删除验收与隔离测试分开记录，见其安装说明。
-- 本次已有离线测试通过：管理中心 49 项、订阅适配器 13 项及装载契约、青岚 158 项、会话管理器 47 项、宿主补丁隔离套件 56 项，另有 VS Code 修复既有脚本通过。未安装补丁、启动真实编辑器、发起模型联网测试或对真实会话执行永久删除；不上传本机 profile、凭据或用户数据。
+- 本轮 Git 工作台三项语法检查及项目规定的完整回归 **124/124 通过，0 失败、0 跳过**；写入仅发生在临时仓库和本地 bare 远程。独立静态审查未发现发布阻塞，但新提交图、加载更多和分页尚不能据既有回归宣称完成真实 GUI 验收。本轮不部署插件、不操作用户工程 Git 写入、不上传本机 profile、凭据或用户数据；前一轮其他插件的测试记录见历史说明。
 - 后续从本合集现有 `main` 正常推送：`git push origin HEAD:refs/heads/main`。不要把各独立仓库的根树依次推到同一个目标 `main`，否则会丢失合集目录结构或产生非快进冲突。
 
 ## 使用与构建

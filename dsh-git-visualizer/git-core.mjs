@@ -167,12 +167,18 @@ export class GitReader {
   /** One refresh, sharing only this call's HEAD/branch/status reads. Never cached:
    * details() used by mutations must still re-read the repository each time.
    */
-  async overview() {
-    const { snapshot, state } = await this._snapshot();
-    return { snapshot, details: state ? await this._details(state) : null };
+  async overview(historyLimit) {
+    const { snapshot, state } = await this._snapshot(historyLimit);
+    const result = { snapshot, details: state ? await this._details(state) : null };
+    if (historyLimit !== undefined && state) {
+      const shallow = await this._git(['rev-parse', '--is-shallow-repository']);
+      result.history = { scope: 'all', limit: historyLimit, hasMore: snapshot.commits.length > historyLimit, shallow: shallow.stdout.trim() === 'true' };
+      snapshot.commits = snapshot.commits.slice(0, historyLimit);
+    }
+    return result;
   }
 
-  async _snapshot() {
+  async _snapshot(historyLimit) {
     const empty = { isRepository: false, branch: null, status: [], branches: [], commits: [] };
     if (!await this._isRepository()) return { snapshot: empty, state: null };
     const branchResult = await this._git(['symbolic-ref', '--quiet', '--short', 'HEAD'], [1]);
@@ -189,10 +195,14 @@ export class GitReader {
       status.push({ path: record.slice(3), index, worktree, oldPath: renamed ? records[++i] : null });
     }
     const commits = [];
-    if (head.code === 0) {
-      // Pin history to the HEAD already read, even if an external commit happens
-      // before log runs; overview.details.head then agrees with commits[0].hash.
-      const log = await this._git(['log', '-100', '-z', '--date=iso-strict', '--format=%H%x00%P%x00%s%x00%an%x00%aI%x00%D', head.stdout.trim(), '--']);
+    const allHistory = historyLimit !== undefined;
+    const hasRefs = allHistory && head.code !== 0 && (await this._git([
+      'for-each-ref', '--count=1', '--format=%(refname)', 'refs/heads/', 'refs/remotes/', 'refs/tags/',
+    ])).stdout.length > 0;
+    if (head.code === 0 || hasRefs) {
+      // Always include this call's fixed HEAD, even when detached. With all-ref
+      // history it need not be the first commit; details still uses the same OID.
+      const log = await this._git(['log', ...(allHistory ? ['--branches', '--remotes', '--tags'] : []), `-${allHistory ? historyLimit + 1 : 100}`, '-z', '--topo-order', '--decorate=short', '--date=iso-strict', '--format=%H%x00%P%x00%s%x00%an%x00%aI%x00%D', ...(head.code === 0 ? [head.stdout.trim()] : []), '--']);
       const fields = log.stdout.split('\0');
       for (let i = 0; i + 5 < fields.length; i += 6) {
         const [hash, parents, subject, author, date, refs] = fields.slice(i, i + 6);

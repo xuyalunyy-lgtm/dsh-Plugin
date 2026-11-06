@@ -77,9 +77,14 @@ export function apply(ctx) {
           // History can outlive repository removal. Do not discover or run Git.
           return reply({ records: journal.list({ sessionId: body.sessionId, workspaceRoot: root, repository: body.repository }), persistent: false });
         }
+        if (route !== 'overview' && has(body, 'historyLimit')) return reply({ error: '此接口不支持 historyLimit' }, 400);
         if (route === 'action') validateAction(body);
-        else if ((route === 'details' || route === 'overview' || route === 'summary' || route === 'branchMetadata') && !allowedKeys(body, ['sessionId', 'repository'])) return reply({ error: '请求包含不允许的参数' }, 400);
+        else if (route === 'overview') {
+          if (!allowedKeys(body, ['sessionId', 'repository', 'historyLimit'])) return reply({ error: '请求包含不允许的参数' }, 400);
+          if (has(body, 'historyLimit') && (!Number.isInteger(body.historyLimit) || body.historyLimit < 100 || body.historyLimit > 1000)) return reply({ error: 'historyLimit 必须是 100 到 1000 的整数' }, 400);
+        } else if ((route === 'details' || route === 'summary' || route === 'branchMetadata') && !allowedKeys(body, ['sessionId', 'repository'])) return reply({ error: '请求包含不允许的参数' }, 400);
         else if (route === 'preview' && (!allowedKeys(body, ['sessionId', 'repository', 'path']) || typeof body.path !== 'string' || !body.path || body.path.length > 4096 || body.path.includes('\0'))) return reply({ error: '无效预览参数' }, 400);
+        else if (route === 'diff' && (body.path !== undefined && typeof body.path !== 'string' || body.commit !== undefined && typeof body.commit !== 'string' || body.staged !== undefined && typeof body.staged !== 'boolean')) return reply({ error: '无效差异参数' }, 400);
         if (route === 'repositories') return reply({ ...await scanRepositories(root), workspaceRoot: root });
         const repository = await selectRepository(root, body.repository === undefined ? '.' : body.repository);
         if (route === 'action') {
@@ -111,7 +116,7 @@ export function apply(ctx) {
         if (route === 'summary') return reply(await reader.summary());
         if (route === 'branchMetadata') return reply(await reader.branchMetadata());
         if (route === 'overview') {
-          const result = await reader.overview();
+          const result = await reader.overview(body.historyLimit);
           if (result.snapshot.isRepository === false) return reply({ error: '当前会话工作区不是 Git 仓库。请打开已有仓库的会话。' }, 400);
           return reply(result);
         }
@@ -121,7 +126,6 @@ export function apply(ctx) {
           if (result.isRepository === false) return reply({ error: '当前会话工作区不是 Git 仓库。请打开已有仓库的会话。' }, 400);
           return reply(result);
         }
-        if (body.path !== undefined && typeof body.path !== 'string' || body.commit !== undefined && typeof body.commit !== 'string' || body.staged !== undefined && typeof body.staged !== 'boolean') return reply({ error: '无效差异参数' }, 400);
         return reply({ text: await reader.diff({ path: body.path, commit: body.commit, staged: body.staged }) });
       } catch (error) {
         return reply({ error: String(error?.message || 'Git 请求失败，请刷新后重试').slice(0, 4096) }, errorStatus(error));
