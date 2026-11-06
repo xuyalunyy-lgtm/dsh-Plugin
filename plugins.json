@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "origin": "git@github.com:xuyalunyy-lgtm/dsh-Plugin.git",
+  "plugins": [
+    { "id": "dsh-codex-break-defense", "sourceType": "git", "source": "../dsh-codex-break-defense", "exclude": [], "files": [] },
+    { "id": "dsh-codex-manager", "sourceType": "git", "source": "../dsh-codex-manager", "exclude": [], "files": [] },
+    { "id": "dsh-codex-subscription", "sourceType": "git", "source": "../dsh-codex-subscription", "exclude": [], "files": [] },
+    { "id": "dsh-desktop-quick-actions", "sourceType": "git", "source": "../dsh-desktop-quick-actions", "exclude": [], "files": [] },
+    { "id": "dsh-document-search", "sourceType": "git", "source": "../dsh-document-search", "exclude": ["client.js", "src/pdf-assets.json"], "files": [] },
+    { "id": "dsh-focus-calendar", "sourceType": "git", "source": "../dsh-focus-calendar", "exclude": [], "files": [] },
+    { "id": "dsh-git-visualizer", "sourceType": "git", "source": "../dsh-git-visualizer", "exclude": [], "files": [] },
+    { "id": "dsh-qinglan-theme", "sourceType": "git", "source": "../dsh-qinglan-theme", "exclude": [], "files": [] },
+    { "id": "dsh-open-in-app-fix", "sourceType": "files", "source": "../dsh-open-in-app-fix", "exclude": [], "files": ["README.md", "index.mjs", "test.mjs", "acceptance.mjs"] },
+    { "id": "dsh-embedded-preset", "sourceType": "files", "source": "../dsh-embedded-preset", "exclude": [], "files": ["package.json", "icon.svg", "cordis.patch.yml", "locale/en.json", "locale/zh.json"] },
+    { "id": "dsh-session-manager", "sourceType": "in-place", "source": "dsh-session-manager", "exclude": [], "files": [] },
+    { "id": "dsh-session-purge-core", "sourceType": "in-place", "source": "dsh-session-purge-core", "exclude": [], "files": [] }
+  ]
+}

@@ -112,7 +112,7 @@ export class CodexAdapter extends LlmAdapter {
   }
 
   /**
-   * 组装模型目录,带 60s 内存缓存(按凭证形态/账号/版本/显式目录做键)。
+   * 组装模型目录,带 60s 内存缓存(按凭证形态/账号/版本/显式目录/缓存文件做键)。
    * 0.2.x 宿主在 prepareCall → resolveModel 路径上每次调用都会问目录,
    * 无缓存就意味着每轮对话先打一轮 /codex/models。
    * @returns `{ config, creds, catalog }`,creds 仍按请求即时读取(热跟随)。
@@ -127,6 +127,7 @@ export class CodexAdapter extends LlmAdapter {
       creds.accountId ?? '',
       config.clientVersion,
       config.staticModels ?? null,
+      config.modelsCacheFile ?? null,
     ]);
     const now = Date.now();
     const hit = this.catalogCache;

@@ -1,6 +1,6 @@
 # dsh-llm-codex
 
-> 📦 已发布到 npm:[dsh-llm-codex](https://www.npmjs.com/package/dsh-llm-codex)(本地开发版本 0.2.4，未发布)
+> 📦 已发布到 npm:[dsh-llm-codex](https://www.npmjs.com/package/dsh-llm-codex)(本地开发版本 0.2.5，未发布)
 > · 📚 GitHub:[yequ172672/dsh-codex-subscription](https://github.com/yequ172672/dsh-codex-subscription)
 > · 🏷️ 属于 [dsh-plugin](https://github.com/topics/dsh-plugin) 插件话题
 
@@ -14,7 +14,7 @@ DSH(DeepSeek Harness)LLM 适配器插件:**直接复用 Codex CLI 的本地登�
 
 | 插件版本 | DSH 桌面端 | 宿主 dsh-llm | 配置模型 |
 | --- | --- | --- | --- |
-| 0.2.3–0.2.4 | 0.2.1-rc.3 / 0.2.2-rc.1 | 同左，由宿主共享 | 导出 `Config` + 全字段 `.volatile()`,设置页自动生成 |
+| 0.2.3–0.2.5 | 0.2.1-rc.3 / 0.2.2-rc.1 | 同左，由宿主共享 | 导出 `Config` + 全字段 `.volatile()`,设置页自动生成 |
 | 0.2.0–0.2.2 | ≥ 44(0.2.0-rc.2) | 0.2.x | 导出 `Config` + 全字段 `.volatile()`,设置页自动生成 |
 | 0.1.x | ≤ 43(0.1.0-rc.6) | 0.1.x | `settings.yaml` 的 `llm-codex:` 段 |
 
@@ -69,6 +69,12 @@ Codex CLI(`codex login`)会把 ChatGPT 订阅的 OAuth 令牌写入 `~/.codex/au
   "No tool output found for function call"(400)拒绝整轮请求。
 - **多模态**:用户上传的图片按附件 id 读取,编码成 `input_image` + `data:` URL 发送;
   目录里 `input_modalities` 含 `image` 的模型(2026-10 目录 9 个模型全部支持)可直接看图。
+
+## 0.2.5 模型缓存文件热切换
+
+将 `modelsCacheFile` 加入既有模型目录缓存 key。此前实时目录不可用、已从文件 A 回退并缓存目录后，若在 60 秒内把此 volatile 配置改为文件 B，下一次查询仍可能命中文件 A 的旧目录；现在切换路径会在下一次目录查询时使旧缓存失效，按原有实时 → 文件 → 静态列表顺序重建。未改变 60 秒 TTL、回退顺序或同一路径文件内容变更的缓存行为，未增加重试、配置或依赖。
+
+验证仅使用既有序列化 / Fast 离线测试、装载契约脚本和语法检查；这些测试没有覆盖目录文件切换场景，不能作为该场景或运行中 Host 已部署的专项验证。没有执行网络请求或读取真实凭据。更换代码后需重启 DSH。
 
 ## 0.2.4 请求生命周期整理
 
